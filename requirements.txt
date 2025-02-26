@@ -1,0 +1,11 @@
+yfinance
+pytrends
+psycopg2
+python-dotenv
+scikit-learn
+xgboost
+urllib3==1.26.20
+google-genai
+fastapi 
+uvicorn 
+psycopg2-binary
