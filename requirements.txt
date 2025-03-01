@@ -9,3 +9,17 @@ google-genai
 fastapi 
 uvicorn 
 psycopg2-binary
+seaborn
+plotly
+statsmodels
+shap
+causalimpact
+# gxx
+ipywidgets
+matplotlib
+pandas
+numpy
+scipy
+nbformat
+prophet
+ruptures
