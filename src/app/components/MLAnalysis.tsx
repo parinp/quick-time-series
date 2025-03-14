@@ -358,21 +358,6 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           <Typography variant="body2" paragraph>
             The ML API server is not running. Please start the server to automatically run the analysis.
           </Typography>
-          <Typography variant="body2">
-            Run the following command in a terminal to start the server:
-          </Typography>
-          <Box 
-            component="pre" 
-            sx={{ 
-              bgcolor: 'rgba(0,0,0,0.1)', 
-              p: 1, 
-              borderRadius: 1, 
-              overflow: 'auto',
-              fontSize: '0.8rem'
-            }}
-          >
-            cd src/app/api/ml && python server.py
-          </Box>
         </Alert>
       );
     }
