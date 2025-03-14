@@ -1,0 +1,17 @@
+.git
+.gitignore
+.next
+node_modules
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.env.local
+*.ipynb
+data/
+README.md
+*.md 
