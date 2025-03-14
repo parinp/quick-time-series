@@ -1,0 +1,25 @@
+# FastAPI and web server
+fastapi==0.95.1
+uvicorn==0.22.0
+python-multipart==0.0.6
+
+# Data processing
+pandas==2.0.1
+numpy==1.24.3
+scikit-learn==1.2.2
+xgboost==1.7.5
+shap==0.41.0
+ruptures==1.1.7
+
+# Database
+supabase==1.0.3
+psycopg2-binary==2.9.6
+python-dotenv==1.0.0
+
+# Visualization
+plotly==5.14.1
+matplotlib==3.7.1
+
+# Utilities
+python-jose==3.3.0
+httpx==0.24.0 
