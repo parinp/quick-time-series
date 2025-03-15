@@ -42,7 +42,6 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MLAnalysisResults | null>(null);
-  const [showExplanations, setShowExplanations] = useState<boolean>(false);
   const [apiAvailable, setApiAvailable] = useState<boolean | null>(null);
   const [checkingApi, setCheckingApi] = useState<boolean>(false);
   const [analysisInitiated, setAnalysisInitiated] = useState<boolean>(false);
@@ -58,7 +57,17 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     setAnalysisInitiated(true);
     
     try {
-      const analysisResults = await analyzeData(data, dateColumn, targetColumn);
+      // Filter out the 'open' feature from the data before sending to the ML service
+      const filteredData = data.map(item => {
+        const newItem = { ...item };
+        if ('open' in newItem) {
+          delete newItem.open;
+        }
+        return newItem;
+      });
+      
+      // Request multiple waterfall plots for different examples
+      const analysisResults = await analyzeData(filteredData, dateColumn, targetColumn, true);
       setResults(analysisResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during analysis');
@@ -193,68 +202,32 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           <Typography variant="h6">
             SHAP Analysis
           </Typography>
-          <Button
-            size="small"
-            onClick={() => setShowExplanations(!showExplanations)}
-            variant={showExplanations ? "contained" : "outlined"}
-          >
-            {showExplanations ? "Hide Explanations" : "Show Explanations"}
-          </Button>
         </Box>
         
-        {showExplanations && (
-          <Alert severity="info" sx={{ mb: 3 }}>
-            <Typography variant="subtitle2" gutterBottom>
-              What are SHAP values?
-            </Typography>
-            <Typography variant="body2">
-              SHAP (SHapley Additive exPlanations) values explain how much each feature contributes to the prediction
-              for a specific instance, compared to the average prediction. They help understand which features are most
-              important for the model's predictions and how they impact the outcome.
-            </Typography>
-          </Alert>
-        )}
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            What are SHAP values?
+          </Typography>
+          <Typography variant="body2">
+            SHAP (SHapley Additive exPlanations) values explain how much each feature contributes to the prediction
+            for a specific instance, compared to the average prediction. They help understand which features are most
+            important for the model's predictions and how they impact the outcome.
+          </Typography>
+        </Alert>
         
         <Grid container spacing={3}>
-          {/* Summary Plot */}
-          <Grid item xs={12} md={6}>
-            <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle1">
-                  SHAP Summary Plot
-                </Typography>
-                {showExplanations && (
-                  <Tooltip title={shapDescriptions.summary}>
-                    <IconButton size="small" sx={{ color: 'white' }}>
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <img 
-                  src={`data:image/png;base64,${shap_plots.summary_plot}`} 
-                  alt="SHAP Summary Plot" 
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                />
-              </Box>
-            </Paper>
-          </Grid>
-          
-          {/* Bar Plot */}
+          {/* Bar Plot - Now first */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1">
                   SHAP Feature Importance
                 </Typography>
-                {showExplanations && (
-                  <Tooltip title={shapDescriptions.bar}>
-                    <IconButton size="small" sx={{ color: 'white' }}>
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
+                <Tooltip title={shapDescriptions.bar}>
+                  <IconButton size="small" sx={{ color: 'white' }}>
+                    <InfoIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <img 
@@ -266,80 +239,121 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             </Paper>
           </Grid>
           
-          {/* Beeswarm Plot */}
+          {/* Beeswarm Plot - Renamed to Summary Plot */}
           <Grid item xs={12} md={6}>
             <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1">
-                  SHAP Beeswarm Plot
+                  SHAP Summary Plot
                 </Typography>
-                {showExplanations && (
-                  <Tooltip title={shapDescriptions.beeswarm}>
-                    <IconButton size="small" sx={{ color: 'white' }}>
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
+                <Tooltip title={shapDescriptions.beeswarm}>
+                  <IconButton size="small" sx={{ color: 'white' }}>
+                    <InfoIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <img 
                   src={`data:image/png;base64,${shap_plots.beeswarm_plot}`} 
-                  alt="SHAP Beeswarm Plot" 
+                  alt="SHAP Summary Plot" 
                   style={{ maxWidth: '100%', height: 'auto' }}
                 />
               </Box>
             </Paper>
           </Grid>
           
-          {/* Waterfall Plot */}
-          <Grid item xs={12} md={6}>
+          {/* Waterfall Plots - Multiple examples */}
+          <Grid item xs={12}>
             <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1">
-                  SHAP Waterfall Plot (Single Instance)
+                  SHAP Waterfall Plots (Sample Predictions)
                 </Typography>
-                {showExplanations && (
-                  <Tooltip title={shapDescriptions.waterfall}>
-                    <IconButton size="small" sx={{ color: 'white' }}>
-                      <InfoIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
+                <Tooltip title={shapDescriptions.waterfall}>
+                  <IconButton size="small" sx={{ color: 'white' }}>
+                    <InfoIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
-              <Box sx={{ mt: 2, textAlign: 'center' }}>
-                <img 
-                  src={`data:image/png;base64,${shap_plots.waterfall_plot}`} 
-                  alt="SHAP Waterfall Plot" 
-                  style={{ maxWidth: '100%', height: 'auto' }}
-                />
-              </Box>
+              
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                These plots show how each feature contributes to three different predictions: low, medium, and high sales examples.
+              </Typography>
+              
+              <Grid container spacing={2}>
+                {/* Low Sales Example */}
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 1, p: 1 }}>
+                    <Typography variant="subtitle2" align="center" gutterBottom>
+                      Low Sales Example
+                    </Typography>
+                    <Box sx={{ mt: 1, textAlign: 'center' }}>
+                      <img 
+                        src={`data:image/png;base64,${shap_plots.waterfall_plot_low}`} 
+                        alt="SHAP Waterfall Plot - Low Sales" 
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    </Box>
+                  </Box>
+                </Grid>
+                
+                {/* Medium Sales Example */}
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 1, p: 1 }}>
+                    <Typography variant="subtitle2" align="center" gutterBottom>
+                      Medium Sales Example
+                    </Typography>
+                    <Box sx={{ mt: 1, textAlign: 'center' }}>
+                      <img 
+                        src={`data:image/png;base64,${shap_plots.waterfall_plot_medium}`} 
+                        alt="SHAP Waterfall Plot - Medium Sales" 
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    </Box>
+                  </Box>
+                </Grid>
+                
+                {/* High Sales Example */}
+                <Grid item xs={12} md={4}>
+                  <Box sx={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 1, p: 1 }}>
+                    <Typography variant="subtitle2" align="center" gutterBottom>
+                      High Sales Example
+                    </Typography>
+                    <Box sx={{ mt: 1, textAlign: 'center' }}>
+                      <img 
+                        src={`data:image/png;base64,${shap_plots.waterfall_plot_high}`} 
+                        alt="SHAP Waterfall Plot - High Sales" 
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                      />
+                    </Box>
+                  </Box>
+                </Grid>
+              </Grid>
             </Paper>
           </Grid>
         </Grid>
         
-        {showExplanations && (
-          <Accordion sx={{ mt: 3, bgcolor: '#1a1f2c', color: 'white' }}>
-            <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}>
-              <Typography>Understanding SHAP Plot Colors</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" paragraph>
-                In SHAP plots, colors represent the feature values:
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-                <Chip label="High Value" sx={{ bgcolor: '#ff0000', color: 'white' }} />
-                <Chip label="Medium Value" sx={{ bgcolor: '#ff7f7f', color: 'black' }} />
-                <Chip label="Low Value" sx={{ bgcolor: '#0000ff', color: 'white' }} />
-              </Box>
-              <Typography variant="body2" paragraph>
-                <strong>Horizontal position:</strong> Shows the impact on the prediction. Points to the right indicate a positive impact (increasing the prediction), while points to the left indicate a negative impact (decreasing the prediction).
-              </Typography>
-              <Typography variant="body2">
-                <strong>Vertical position:</strong> In the summary and beeswarm plots, features are ordered by importance, with the most important at the top.
-              </Typography>
-            </AccordionDetails>
-          </Accordion>
-        )}
+        <Accordion sx={{ mt: 3, bgcolor: '#1a1f2c', color: 'white' }} defaultExpanded={true}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}>
+            <Typography>Understanding SHAP Plot Colors</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Typography variant="body2" paragraph>
+              In SHAP plots, colors represent the feature values:
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+              <Chip label="High Value" sx={{ bgcolor: '#ff0000', color: 'white' }} />
+              <Chip label="Medium Value" sx={{ bgcolor: '#ff7f7f', color: 'black' }} />
+              <Chip label="Low Value" sx={{ bgcolor: '#0000ff', color: 'white' }} />
+            </Box>
+            <Typography variant="body2" paragraph>
+              <strong>Horizontal position:</strong> Shows the impact on the prediction. Points to the right indicate a positive impact (increasing the prediction), while points to the left indicate a negative impact (decreasing the prediction).
+            </Typography>
+            <Typography variant="body2">
+              <strong>Vertical position:</strong> In the summary plot, features are ordered by importance, with the most important at the top.
+            </Typography>
+          </AccordionDetails>
+        </Accordion>
       </Box>
     );
   };
