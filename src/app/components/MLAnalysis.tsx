@@ -36,6 +36,9 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   dateColumn,
   targetColumn,
 }) => {
+  console.log('MLAnalysis component mounting...');
+  console.log('Props received:', { dataLength: data?.length, dateColumn, targetColumn });
+
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MLAnalysisResults | null>(null);

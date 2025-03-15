@@ -86,16 +86,30 @@ export async function checkApiHealth(): Promise<boolean> {
   const maxRetries = 3;
   const retryDelay = 2000; // 2 seconds
 
+  // Log the API URL being used
+  console.log('API Base URL:', API_BASE_URL);
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       console.log(`Checking API health (attempt ${attempt + 1}/${maxRetries})...`);
       const response = await fetch(`${API_BASE_URL}/health`, {
         method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Origin': window.location.origin
+        },
+        mode: 'cors',
       });
+
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (response.ok) {
         const data = await response.json();
+        console.log('Health check response:', data);
         return data.status === 'healthy';
+      } else {
+        console.log('Health check failed:', await response.text());
       }
 
       // If not successful and not last attempt, wait before retrying
