@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uvicorn
 import logging
-from .utils import analyze_data
+from utils import analyze_data
 
 # Configure logging
 logging.basicConfig(
