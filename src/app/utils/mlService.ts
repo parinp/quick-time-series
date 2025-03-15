@@ -1,7 +1,7 @@
 import { TimeSeriesData } from './types';
 
-// API base URL - change this to your FastAPI server URL
-const API_BASE_URL = 'http://localhost:8000';
+// API base URL - use environment variable or fallback to local development
+const API_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8000';
 
 /**
  * Interface for ML analysis results
