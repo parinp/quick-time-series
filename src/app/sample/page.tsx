@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, CircularProgress, Paper, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent } from '@mui/material';
+import { Box, Typography, CircularProgress, Paper, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, TextField, Button } from '@mui/material';
 import { TimeSeriesData } from '../utils/types';
 import ColumnSelector from '../components/ColumnSelector';
 import DataVisualization from '../components/DataVisualization';
-import { fetchRossmannData, fetchStoreData } from '../utils/supabaseClient';
+import { fetchRossmannData, fetchStoreData, fetchAllStoreIds } from '../utils/supabaseClient';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Plotly to avoid SSR issues
@@ -20,23 +20,32 @@ export default function SamplePage() {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [selectedStore, setSelectedStore] = useState<string>('all');
   const [storeList, setStoreList] = useState<number[]>([]);
+  const [directStoreInput, setDirectStoreInput] = useState<string>('');
+  const [displayedStores, setDisplayedStores] = useState<number[]>([]);
+  const [isLoadingStores, setIsLoadingStores] = useState<boolean>(true);
 
+  // Load initial data and store IDs
   useEffect(() => {
     const loadSampleData = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        // Load the sample data for all stores (limited to 10,000 records)
+        // First, get all unique store IDs directly from the database
+        const storeIds = await fetchAllStoreIds();
+        console.log(`Loaded ${storeIds.length} store IDs`);
+        setStoreList(storeIds);
+        setIsLoadingStores(false);
+        
+        // Display first 20 stores initially for better performance
+        setDisplayedStores(storeIds.slice(0, 20));
+        
+        // Load the sample data for all stores
         const rossmannData = await fetchRossmannData();
         
         if (!rossmannData || rossmannData.length === 0) {
           throw new Error('No data found in the Supabase database');
         }
-        
-        // Extract unique store IDs
-        const stores = [...new Set(rossmannData.map(item => item.store_id))].sort((a, b) => a - b);
-        setStoreList(stores);
         
         // Convert to TimeSeriesData format
         const formattedData = rossmannData.map(item => {
@@ -53,6 +62,7 @@ export default function SamplePage() {
       } catch (err) {
         setError(`Error loading sample data: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setIsLoading(false);
+        setIsLoadingStores(false);
       }
     };
     
@@ -62,11 +72,22 @@ export default function SamplePage() {
   const handleStoreChange = async (event: SelectChangeEvent) => {
     const storeId = event.target.value;
     setSelectedStore(storeId);
+    loadStoreData(storeId);
+  };
+
+  const handleDirectStoreSubmit = () => {
+    if (directStoreInput) {
+      setSelectedStore(directStoreInput);
+      loadStoreData(directStoreInput);
+    }
+  };
+
+  const loadStoreData = async (storeId: string) => {
     setIsLoading(true);
     
     try {
       if (storeId === 'all') {
-        // Load data for all stores (limited)
+        // Load data for all stores (aggregated by date)
         const rossmannData = await fetchRossmannData();
         const formattedData = rossmannData.map(item => ({
           ...item,
@@ -107,23 +128,71 @@ export default function SamplePage() {
       
       {!isLoading && !error && (
         <Box sx={{ mb: 4 }}>
+          {/* Direct store ID input */}
+          <Box sx={{ display: 'flex', mb: 2, gap: 2 }}>
+            <TextField
+              label="Enter Store Number"
+              variant="outlined"
+              size="small"
+              value={directStoreInput}
+              onChange={(e) => setDirectStoreInput(e.target.value)}
+              sx={{ flexGrow: 1 }}
+            />
+            <Button 
+              variant="contained" 
+              onClick={handleDirectStoreSubmit}
+              disabled={!directStoreInput}
+            >
+              Load Store
+            </Button>
+          </Box>
+          
+          {/* Store dropdown */}
           <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel id="store-select-label">Select Store</InputLabel>
+            <InputLabel id="store-select-label">Store Number</InputLabel>
             <Select
               labelId="store-select-label"
               id="store-select"
               value={selectedStore}
-              label="Select Store"
+              label="Store Number"
               onChange={handleStoreChange}
+              MenuProps={{
+                PaperProps: {
+                  style: {
+                    maxHeight: 300,
+                  },
+                },
+              }}
             >
               <MenuItem value="all">All Stores (Aggregated)</MenuItem>
-              {storeList.map(store => (
-                <MenuItem key={store} value={store.toString()}>
-                  Store {store}
+              
+              {isLoadingStores ? (
+                <MenuItem disabled>
+                  <CircularProgress size={20} /> Loading stores...
                 </MenuItem>
-              ))}
+              ) : displayedStores.length === 0 ? (
+                <MenuItem disabled>No stores available</MenuItem>
+              ) : (
+                displayedStores.map(store => (
+                  <MenuItem key={store} value={store.toString()}>
+                    Store {store}
+                  </MenuItem>
+                ))
+              )}
+              
+              {displayedStores.length < storeList.length && (
+                <MenuItem disabled>
+                  <Typography variant="caption">
+                    Showing 20 of {storeList.length} stores. Use the text field above to enter a specific store number.
+                  </Typography>
+                </MenuItem>
+              )}
             </Select>
           </FormControl>
+          
+          <Typography variant="body2" color="text.secondary">
+            {storeList.length} stores available in database
+          </Typography>
         </Box>
       )}
       
