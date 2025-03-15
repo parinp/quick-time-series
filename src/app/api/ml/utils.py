@@ -33,11 +33,11 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     df[date_column] = pd.to_datetime(df[date_column])
     
     # Extract features from date
-    df['year'] = df[date_column].dt.year
-    df['month'] = df[date_column].dt.month
-    df['day'] = df[date_column].dt.day
-    df['day_of_week'] = df[date_column].dt.dayofweek
-    df['is_weekend'] = df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)
+    # df['year'] = df[date_column].dt.year
+    # df['month'] = df[date_column].dt.month
+    # df['day'] = df[date_column].dt.day
+    # df['day_of_week'] = df[date_column].dt.dayofweek
+    # df['is_weekend'] = df['day_of_week'].apply(lambda x: 1 if x >= 5 else 0)
     
     # Drop the date column and any rows with NaN values
     features = df.drop([date_column, target_column], axis=1)
