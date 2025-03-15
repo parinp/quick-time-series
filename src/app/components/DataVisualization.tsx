@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Box, 
   Paper, 
@@ -26,9 +26,10 @@ import dynamic from 'next/dynamic';
 import { TimeSeriesData } from '../utils/types';
 import { groupBy, addTimeFeatures } from '../utils/dataProcessing';
 import EnhancedTimeSeriesChart from './EnhancedTimeSeriesChart';
-import { format, isAfter, isBefore, getYear, startOfYear, endOfYear } from 'date-fns';
+import { format, getYear } from 'date-fns';
 import { Data } from 'plotly.js';
 import MLAnalysis from './MLAnalysis';
+import { useData } from '../utils/DataContext';
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -44,91 +45,65 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   dateColumn, 
   targetColumn 
 }) => {
+  const {
+    allData,
+    timeSeriesData,
+    additionalAnalysisData,
+    tsFilterStartDate,
+    setTsFilterStartDate,
+    tsFilterEndDate,
+    setTsFilterEndDate,
+    aaFilterStartDate,
+    setAaFilterStartDate,
+    aaFilterEndDate,
+    setAaFilterEndDate,
+    selectedYears,
+    setSelectedYears,
+    availableYears
+  } = useData();
+  
   const [timeFeatureData, setTimeFeatureData] = useState<TimeSeriesData[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [dowData, setDowData] = useState<any[]>([]);
   const [selectedChart, setSelectedChart] = useState<string>('monthlyPattern');
-  const [filterStartDate, setFilterStartDate] = useState<Date | null>(null);
-  const [filterEndDate, setFilterEndDate] = useState<Date | null>(null);
-  const [availableYears, setAvailableYears] = useState<number[]>([]);
-  const [selectedYears, setSelectedYears] = useState<number[]>([]);
-  const [filteredData, setFilteredData] = useState<TimeSeriesData[]>([]);
 
-  // Calculate date range from the entire dataset
-  useEffect(() => {
-    if (!data || data.length === 0) return;
-    
-    const dates = data.map(item => {
-      const date = typeof item[dateColumn] === 'string' 
-        ? new Date(item[dateColumn]) 
-        : item[dateColumn];
-      
-      if (!(date instanceof Date) || isNaN(date.getTime())) {
-        return null;
-      }
-      
-      return date;
-    }).filter(date => date !== null) as Date[];
-    
-    if (dates.length === 0) return;
-    
-    const minDate = dates.reduce((a, b) => a < b ? a : b);
-    const maxDate = dates.reduce((a, b) => a > b ? a : b);
-    
-    setFilterStartDate(minDate);
-    setFilterEndDate(maxDate);
-    
-    // Extract unique years
-    const years = dates.map(date => date.getFullYear());
-    const uniqueYears = Array.from(new Set(years)).sort();
-    setAvailableYears(uniqueYears);
-    setSelectedYears(uniqueYears); // Initially select all years
-  }, [data, dateColumn]);
-
-  // Filter data based on selected date range and years
-  useEffect(() => {
-    if (!data || data.length === 0 || !filterStartDate || !filterEndDate) {
-      setFilteredData(data);
-      return;
+  // Process data for charts using additionalAnalysisData (for Additional Analysis)
+  const processedChartData = useMemo(() => {
+    if (!additionalAnalysisData || additionalAnalysisData.length === 0 || !dateColumn || !targetColumn) {
+      return {
+        timeFeatureData: [] as TimeSeriesData[],
+        monthlyData: [] as any[],
+        dowData: [] as any[]
+      };
     }
     
-    const filtered = data.filter(item => {
-      const itemDate = typeof item[dateColumn] === 'string' 
-        ? new Date(item[dateColumn]) 
-        : item[dateColumn];
-      
-      if (!(itemDate instanceof Date) || isNaN(itemDate.getTime())) {
-        return false;
-      }
-      
-      const year = itemDate.getFullYear();
-      
-      return (
-        (itemDate >= filterStartDate || isAfter(itemDate, filterStartDate)) && 
-        (itemDate <= filterEndDate || isBefore(itemDate, filterEndDate)) &&
-        selectedYears.includes(year)
-      );
+    console.log('Processing data for Additional Analysis charts:', {
+      dataLength: additionalAnalysisData.length,
+      years: [...new Set(additionalAnalysisData.map(item => new Date(item[dateColumn]).getFullYear()))].sort(),
     });
     
-    setFilteredData(filtered);
-  }, [data, dateColumn, filterStartDate, filterEndDate, selectedYears]);
-
-  // Process data for charts
+    // Add time features
+    const dataWithTimeFeatures = addTimeFeatures(additionalAnalysisData, dateColumn);
+    
+    // Group by month
+    const byMonth = groupBy(dataWithTimeFeatures, 'month', targetColumn, 'mean');
+    
+    // Group by day of week
+    const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', targetColumn, 'mean');
+    
+    return {
+      timeFeatureData: dataWithTimeFeatures,
+      monthlyData: byMonth,
+      dowData: byDow
+    };
+  }, [additionalAnalysisData, dateColumn, targetColumn]);
+  
+  // Set state from memoized values
   useEffect(() => {
-    if (filteredData && filteredData.length > 0 && dateColumn && targetColumn) {
-      // Add time features
-      const dataWithTimeFeatures = addTimeFeatures(filteredData, dateColumn);
-      setTimeFeatureData(dataWithTimeFeatures);
-
-      // Group by month
-      const byMonth = groupBy(dataWithTimeFeatures, 'month', targetColumn, 'mean');
-      setMonthlyData(byMonth);
-
-      // Group by day of week
-      const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', targetColumn, 'mean');
-      setDowData(byDow);
-    }
-  }, [filteredData, dateColumn, targetColumn]);
+    setTimeFeatureData(processedChartData.timeFeatureData);
+    setMonthlyData(processedChartData.monthlyData);
+    setDowData(processedChartData.dowData);
+  }, [processedChartData]);
 
   const handleChartChange = (event: SelectChangeEvent) => {
     setSelectedChart(event.target.value);
@@ -141,19 +116,31 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         return prev.filter(y => y !== year);
       } else {
         // Add year if not selected
-        return [...prev, year].sort();
+        return [...prev, year].sort((a, b) => a - b);
       }
     });
   };
 
-  const resetFilters = () => {
-    if (data && data.length > 0) {
-      const dates = data.map(item => new Date(item[dateColumn])).filter(date => !isNaN(date.getTime()));
+  const resetTimeSeriesFilters = () => {
+    if (allData && allData.length > 0) {
+      const dates = allData.map(item => new Date(item[dateColumn])).filter(date => !isNaN(date.getTime()));
       if (dates.length > 0) {
         const minDate = dates.reduce((a, b) => a < b ? a : b);
         const maxDate = dates.reduce((a, b) => a > b ? a : b);
-        setFilterStartDate(minDate);
-        setFilterEndDate(maxDate);
+        setTsFilterStartDate(minDate);
+        setTsFilterEndDate(maxDate);
+      }
+    }
+  };
+
+  const resetAdditionalFilters = () => {
+    if (allData && allData.length > 0) {
+      const dates = allData.map(item => new Date(item[dateColumn])).filter(date => !isNaN(date.getTime()));
+      if (dates.length > 0) {
+        const minDate = dates.reduce((a, b) => a < b ? a : b);
+        const maxDate = dates.reduce((a, b) => a > b ? a : b);
+        setAaFilterStartDate(minDate);
+        setAaFilterEndDate(maxDate);
         setSelectedYears(availableYears);
       }
     }
@@ -162,7 +149,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   const renderTimeSeriesChart = () => {
     return (
       <EnhancedTimeSeriesChart
-        data={filteredData}
+        data={timeSeriesData}
         dateField={dateColumn}
         valueField={targetColumn}
         title={`${targetColumn} Over Time`}
@@ -207,6 +194,10 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       });
     });
     
+    console.log('Years in dataByYearAndMonth:', Object.keys(dataByYearAndMonth).sort());
+    console.log('Years in yearlyMonthlyAverages:', Object.keys(yearlyMonthlyAverages).sort());
+    console.log('Selected years for chart:', selectedYears);
+    
     // Create traces for each year
     const traces = selectedYears.map(year => {
       const monthlyValues = Array(12).fill(null);
@@ -215,6 +206,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         Object.entries(yearlyMonthlyAverages[year]).forEach(([month, avg]) => {
           monthlyValues[parseInt(month) - 1] = avg;
         });
+      } else {
+        console.log(`No data found for year ${year}`);
       }
       
       return {
@@ -247,8 +240,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
             y: -0.2
           }
         }}
-        style={{ width: '100%' }}
-        useResizeHandler={true}
+        style={{ width: '100%', height: '100%' }}
+        config={{ responsive: true }}
       />
     );
   };
@@ -329,8 +322,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
             y: -0.2
           }
         }}
-        style={{ width: '100%' }}
-        useResizeHandler={true}
+        style={{ width: '100%', height: '100%' }}
+        config={{ responsive: true }}
       />
     );
   };
@@ -339,7 +332,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     // Group data by year
     const dataByYear: Record<number, number[]> = {};
     
-    filteredData.forEach(item => {
+    additionalAnalysisData.forEach(item => {
       const date = new Date(item[dateColumn]);
       const year = date.getFullYear();
       
@@ -384,8 +377,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
             y: -0.2
           }
         }}
-        style={{ width: '100%' }}
-        useResizeHandler={true}
+        style={{ width: '100%', height: '100%' }}
+        config={{ responsive: true }}
       />
     );
   };
@@ -394,7 +387,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     // Group data by year
     const dataByYear: Record<number, number[]> = {};
     
-    filteredData.forEach(item => {
+    additionalAnalysisData.forEach(item => {
       const date = new Date(item[dateColumn]);
       const year = date.getFullYear();
       
@@ -437,38 +430,21 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
             y: -0.2
           }
         }}
-        style={{ width: '100%' }}
-        useResizeHandler={true}
+        style={{ width: '100%', height: '100%' }}
+        config={{ responsive: true }}
       />
     );
   };
 
-  const renderChart = () => {
-    switch (selectedChart) {
-      case 'monthlyPattern':
-        return renderMonthlyPatternChart();
-      case 'dowPattern':
-        return renderDayOfWeekPatternChart();
-      case 'distribution':
-        return renderDistributionChart();
-      case 'boxPlot':
-        return renderBoxPlot();
-      default:
-        return renderMonthlyPatternChart();
-    }
-  };
-
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Data Visualization
+      {/* Time Series Analysis Section */}
+      <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
+        Time Series Analysis
       </Typography>
       
-      {/* Time Series Section */}
+      {/* Time Series Chart */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
-          Time Series Analysis
-        </Typography>
         <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
           {renderTimeSeriesChart()}
         </Paper>
@@ -476,7 +452,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       
       <Divider sx={{ my: 4 }} />
       
-      {/* Other Charts Section */}
+      {/* Additional Analysis Section */}
       <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
         Additional Analysis
       </Typography>
@@ -493,18 +469,18 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
                 <DatePicker 
                   label="Start Date"
-                  value={filterStartDate}
-                  onChange={(newValue: Date | null) => setFilterStartDate(newValue)}
+                  value={aaFilterStartDate}
+                  onChange={(newValue: Date | null) => setAaFilterStartDate(newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
                 <DatePicker 
                   label="End Date"
-                  value={filterEndDate}
-                  onChange={(newValue: Date | null) => setFilterEndDate(newValue)}
+                  value={aaFilterEndDate}
+                  onChange={(newValue: Date | null) => setAaFilterEndDate(newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
                 <IconButton 
-                  onClick={resetFilters} 
+                  onClick={resetAdditionalFilters} 
                   sx={{ color: 'white', alignSelf: 'center' }}
                   title="Reset Filters"
                 >
@@ -550,7 +526,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
                 <MenuItem value="monthlyPattern">Monthly Pattern</MenuItem>
                 <MenuItem value="dowPattern">Day of Week Pattern</MenuItem>
                 <MenuItem value="distribution">Distribution</MenuItem>
-                <MenuItem value="boxPlot">Box Plot</MenuItem>
+                <MenuItem value="boxplot">Box Plot</MenuItem>
               </Select>
             </FormControl>
           </Paper>
@@ -558,8 +534,13 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         
         {/* Chart Display */}
         <Grid item xs={12}>
-          <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
-            {renderChart()}
+          <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white', overflow: 'hidden' }}>
+            <Box sx={{ width: '100%', height: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+              {selectedChart === 'monthlyPattern' && renderMonthlyPatternChart()}
+              {selectedChart === 'dowPattern' && renderDayOfWeekPatternChart()}
+              {selectedChart === 'distribution' && renderDistributionChart()}
+              {selectedChart === 'boxplot' && renderBoxPlot()}
+            </Box>
           </Paper>
         </Grid>
       </Grid>
@@ -568,7 +549,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       
       {/* ML Analysis Section */}
       <MLAnalysis 
-        data={filteredData}
+        data={allData}
         dateColumn={dateColumn}
         targetColumn={targetColumn}
       />

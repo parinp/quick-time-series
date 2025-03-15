@@ -1,112 +1,65 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Box, Typography, CircularProgress, Paper, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, TextField, Button } from '@mui/material';
-import { TimeSeriesData } from '../utils/types';
 import ColumnSelector from '../components/ColumnSelector';
 import DataVisualization from '../components/DataVisualization';
-import { fetchRossmannData, fetchStoreData, fetchAllStoreIds } from '../utils/supabaseClient';
+import { useData } from '../utils/DataContext';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
 
 export default function SamplePage() {
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [data, setData] = useState<TimeSeriesData[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [dateColumn, setDateColumn] = useState<string>('date');
-  const [targetColumn, setTargetColumn] = useState<string>('sales');
+  const { 
+    allData,
+    storeFilteredData,
+    storeList, 
+    isLoading, 
+    storeLoading,
+    error, 
+    selectedStore, 
+    setSelectedStore,
+    dateColumn,
+    setDateColumn,
+    targetColumn,
+    setTargetColumn
+  } = useData();
+  
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [selectedStore, setSelectedStore] = useState<string>('all');
-  const [storeList, setStoreList] = useState<number[]>([]);
   const [directStoreInput, setDirectStoreInput] = useState<string>('');
   const [displayedStores, setDisplayedStores] = useState<number[]>([]);
-  const [isLoadingStores, setIsLoadingStores] = useState<boolean>(true);
+  
+  // Set displayed stores for dropdown (limit to 20 for performance)
+  React.useEffect(() => {
+    if (storeList.length > 0) {
+      setDisplayedStores(storeList.slice(0, 20));
+    }
+  }, [storeList]);
+  
+  // Auto-analyze with default columns when data is loaded
+  React.useEffect(() => {
+    if (!isLoading && allData.length > 0 && !isAnalyzing) {
+      setIsAnalyzing(true);
+    }
+  }, [isLoading, allData, isAnalyzing]);
 
-  // Load initial data and store IDs
-  useEffect(() => {
-    const loadSampleData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // First, get all unique store IDs directly from the database
-        const storeIds = await fetchAllStoreIds();
-        console.log(`Loaded ${storeIds.length} store IDs`);
-        setStoreList(storeIds);
-        setIsLoadingStores(false);
-        
-        // Display first 20 stores initially for better performance
-        setDisplayedStores(storeIds.slice(0, 20));
-        
-        // Load the sample data for all stores
-        const rossmannData = await fetchRossmannData();
-        
-        if (!rossmannData || rossmannData.length === 0) {
-          throw new Error('No data found in the Supabase database');
-        }
-        
-        // Convert to TimeSeriesData format
-        const formattedData = rossmannData.map(item => {
-          return {
-            ...item,
-            // Ensure date is in the correct format
-            date: new Date(item.date)
-          };
-        });
-        
-        setData(formattedData);
-        setIsLoading(false);
-        setIsAnalyzing(true); // Auto-analyze with default columns
-      } catch (err) {
-        setError(`Error loading sample data: ${err instanceof Error ? err.message : 'Unknown error'}`);
-        setIsLoading(false);
-        setIsLoadingStores(false);
-      }
-    };
-    
-    loadSampleData();
-  }, []);
-
-  const handleStoreChange = async (event: SelectChangeEvent) => {
+  const handleStoreChange = (event: SelectChangeEvent) => {
     const storeId = event.target.value;
+    console.log('Store selected from dropdown:', storeId);
     setSelectedStore(storeId);
-    loadStoreData(storeId);
   };
 
   const handleDirectStoreSubmit = () => {
     if (directStoreInput) {
-      setSelectedStore(directStoreInput);
-      loadStoreData(directStoreInput);
-    }
-  };
-
-  const loadStoreData = async (storeId: string) => {
-    setIsLoading(true);
-    
-    try {
-      if (storeId === 'all') {
-        // Load data for all stores (aggregated by date)
-        const rossmannData = await fetchRossmannData();
-        const formattedData = rossmannData.map(item => ({
-          ...item,
-          date: new Date(item.date)
-        }));
-        setData(formattedData);
+      const storeNum = parseInt(directStoreInput, 10);
+      if (!isNaN(storeNum) && storeNum > 0) {
+        console.log('Setting store ID to:', storeNum);
+        setSelectedStore(storeNum.toString());
       } else {
-        // Load data for specific store
-        const storeData = await fetchStoreData(parseInt(storeId));
-        const formattedData = storeData.map(item => ({
-          ...item,
-          date: new Date(item.date)
-        }));
-        setData(formattedData);
+        console.error('Invalid store ID:', directStoreInput);
+        // Could add user feedback here
       }
-    } catch (err) {
-      setError(`Error loading store data: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -137,13 +90,14 @@ export default function SamplePage() {
               value={directStoreInput}
               onChange={(e) => setDirectStoreInput(e.target.value)}
               sx={{ flexGrow: 1 }}
+              disabled={storeLoading}
             />
             <Button 
               variant="contained" 
               onClick={handleDirectStoreSubmit}
-              disabled={!directStoreInput}
+              disabled={!directStoreInput || storeLoading}
             >
-              Load Store
+              {storeLoading ? 'Loading...' : 'Load Store'}
             </Button>
           </Box>
           
@@ -156,6 +110,7 @@ export default function SamplePage() {
               value={selectedStore}
               label="Store Number"
               onChange={handleStoreChange}
+              disabled={storeLoading}
               MenuProps={{
                 PaperProps: {
                   style: {
@@ -166,7 +121,7 @@ export default function SamplePage() {
             >
               <MenuItem value="all">All Stores (Aggregated)</MenuItem>
               
-              {isLoadingStores ? (
+              {storeList.length === 0 ? (
                 <MenuItem disabled>
                   <CircularProgress size={20} /> Loading stores...
                 </MenuItem>
@@ -175,7 +130,7 @@ export default function SamplePage() {
               ) : (
                 displayedStores.map(store => (
                   <MenuItem key={store} value={store.toString()}>
-                    Store {store}
+                    {store}
                   </MenuItem>
                 ))
               )}
@@ -192,6 +147,11 @@ export default function SamplePage() {
           
           <Typography variant="body2" color="text.secondary">
             {storeList.length} stores available in database
+            {storeLoading && (
+              <Box component="span" sx={{ ml: 2, display: 'inline-flex', alignItems: 'center' }}>
+                <CircularProgress size={16} sx={{ mr: 1 }} /> Loading store data...
+              </Box>
+            )}
           </Typography>
         </Box>
       )}
@@ -209,12 +169,12 @@ export default function SamplePage() {
         <>
           {!isAnalyzing ? (
             <ColumnSelector 
-              data={data} 
+              data={allData} 
               onColumnsSelected={handleColumnsSelected} 
             />
           ) : (
             <DataVisualization 
-              data={data}
+              data={storeFilteredData}
               dateColumn={dateColumn}
               targetColumn={targetColumn}
             />

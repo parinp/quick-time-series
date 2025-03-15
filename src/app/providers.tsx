@@ -5,6 +5,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { DataProvider } from './utils/DataContext';
 
 // Create a dark theme instance
 const theme = createTheme({
@@ -106,7 +107,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <LocalizationProvider dateAdapter={AdapterDateFns}>
-        {children}
+        <DataProvider>
+          {children}
+        </DataProvider>
       </LocalizationProvider>
     </ThemeProvider>
   );

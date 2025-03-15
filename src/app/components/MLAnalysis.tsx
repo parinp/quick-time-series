@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -24,6 +24,7 @@ import InfoIcon from '@mui/icons-material/Info';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TimeSeriesData } from '../utils/types';
 import { analyzeData, checkApiHealth, getShapDescriptions, MLAnalysisResults } from '../utils/mlService';
+import { useData } from '../utils/DataContext';
 
 interface MLAnalysisProps {
   data: TimeSeriesData[];
@@ -36,9 +37,9 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   dateColumn,
   targetColumn,
 }) => {
-  console.log('MLAnalysis component mounting...');
-  console.log('Props received:', { dataLength: data?.length, dateColumn, targetColumn });
-
+  // Use allData for machine learning analysis (no filters) - this ensures we use the complete dataset
+  const { allData } = useData();
+  
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MLAnalysisResults | null>(null);
@@ -48,8 +49,20 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   
   const shapDescriptions = getShapDescriptions();
   
+  // Memoize the data preparation for ML analysis
+  const preparedData = useMemo(() => {
+    // Filter out the 'open' feature from the data before sending to the ML service
+    return allData.map(item => {
+      const newItem = { ...item };
+      if ('open' in newItem) {
+        delete newItem.open;
+      }
+      return newItem;
+    });
+  }, [allData]);
+  
   // Define handleAnalyze with useCallback to avoid dependency issues
-  const handleAnalyze = React.useCallback(async () => {
+  const handleAnalyze = useCallback(async () => {
     if (loading) return; // Prevent multiple simultaneous calls
     
     setLoading(true);
@@ -57,17 +70,10 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     setAnalysisInitiated(true);
     
     try {
-      // Filter out the 'open' feature from the data before sending to the ML service
-      const filteredData = data.map(item => {
-        const newItem = { ...item };
-        if ('open' in newItem) {
-          delete newItem.open;
-        }
-        return newItem;
-      });
+      console.log(`Analyzing ${preparedData.length} data points with machine learning`);
       
       // Request multiple waterfall plots for different examples
-      const analysisResults = await analyzeData(filteredData, dateColumn, targetColumn, true);
+      const analysisResults = await analyzeData(preparedData, dateColumn, targetColumn, true);
       setResults(analysisResults);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during analysis');
@@ -75,17 +81,14 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [data, dateColumn, targetColumn, loading]);
+  }, [preparedData, dateColumn, targetColumn, loading]);
   
   // Check if the API is available when the component mounts
   useEffect(() => {
     const checkApi = async () => {
       setCheckingApi(true);
-      console.log('Checking API availability...');
-      console.log('API URL:', process.env.NEXT_PUBLIC_ML_API_URL);
       try {
         const isAvailable = await checkApiHealth();
-        console.log('API availability result:', isAvailable);
         setApiAvailable(isAvailable);
       } catch (err) {
         console.error('Error in API check:', err);
@@ -104,6 +107,11 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
       handleAnalyze();
     }
   }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze]);
+  
+  // Add a comment to clarify that we're intentionally using allData instead of the filtered data
+  useEffect(() => {
+    console.log(`ML Analysis will use the complete dataset (${allData.length} records) instead of the filtered data (${data.length} records)`);
+  }, [allData.length, data.length]);
   
   const renderMetrics = () => {
     if (!results) return null;
