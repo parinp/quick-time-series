@@ -165,32 +165,32 @@ def generate_shap_plots(model_data: Dict[str, Any], multiple_waterfall_plots: bo
         high_idx = sorted_indices[int(n_samples * 0.9)]
         
         # Generate force plot for low sales example
-        plt.figure(figsize=(14, 4))
+        plt.figure(figsize=(14, 6))
         plt.title(f"Low Sales Example (Predicted: {y_pred[low_idx]:.2f}, Actual: {y_test.iloc[low_idx]:.2f})")
-        shap.plots.force(shap_values[low_idx], matplotlib=True, show=False)
+        shap.plots.force(shap_values[low_idx], matplotlib=True, show=False, figsize=(14, 3))
         buf = BytesIO()
-        plt.tight_layout(pad=2.0)
-        plt.savefig(buf, format='png', dpi=100)
+        plt.tight_layout(pad=3.0)
+        plt.savefig(buf, format='png', dpi=120)
         plt.close()
         plots['waterfall_plot_low'] = base64.b64encode(buf.getvalue()).decode('utf-8')
         
         # Generate force plot for medium sales example
-        plt.figure(figsize=(14, 4))
+        plt.figure(figsize=(14, 6))
         plt.title(f"Medium Sales Example (Predicted: {y_pred[med_idx]:.2f}, Actual: {y_test.iloc[med_idx]:.2f})")
-        shap.plots.force(shap_values[med_idx], matplotlib=True, show=False)
+        shap.plots.force(shap_values[med_idx], matplotlib=True, show=False, figsize=(14, 3))
         buf = BytesIO()
-        plt.tight_layout(pad=2.0)
-        plt.savefig(buf, format='png', dpi=100)
+        plt.tight_layout(pad=3.0)
+        plt.savefig(buf, format='png', dpi=120)
         plt.close()
         plots['waterfall_plot_medium'] = base64.b64encode(buf.getvalue()).decode('utf-8')
         
         # Generate force plot for high sales example
-        plt.figure(figsize=(14, 4))
+        plt.figure(figsize=(14, 6))
         plt.title(f"High Sales Example (Predicted: {y_pred[high_idx]:.2f}, Actual: {y_test.iloc[high_idx]:.2f})")
-        shap.plots.force(shap_values[high_idx], matplotlib=True, show=False)
+        shap.plots.force(shap_values[high_idx], matplotlib=True, show=False, figsize=(14, 3))
         buf = BytesIO()
-        plt.tight_layout(pad=2.0)
-        plt.savefig(buf, format='png', dpi=100)
+        plt.tight_layout(pad=3.0)
+        plt.savefig(buf, format='png', dpi=120)
         plt.close()
         plots['waterfall_plot_high'] = base64.b64encode(buf.getvalue()).decode('utf-8')
     
