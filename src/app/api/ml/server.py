@@ -67,6 +67,21 @@ async def analyze(request: AnalysisRequest):
             detail={"error": "An error occurred during analysis", "message": str(e)}
         )
 
+@app.get("/")
+async def root():
+    """
+    Root endpoint that provides API information.
+    """
+    return {
+        "message": "Welcome to the ML Analysis API",
+        "version": "1.0.0",
+        "endpoints": {
+            "/": "GET - This information",
+            "/analyze": "POST - Analyze time series data",
+            "/health": "GET - Health check"
+        }
+    }
+
 @app.get("/health")
 async def health_check():
     """
