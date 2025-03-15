@@ -43,8 +43,11 @@ export async function analyzeData(
     const response = await fetch(`${API_BASE_URL}/analyze`, {
       method: 'POST',
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
+      mode: 'cors',
+      credentials: 'omit',
       body: JSON.stringify({
         data,
         dateColumn,
@@ -96,9 +99,10 @@ export async function checkApiHealth(): Promise<boolean> {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
-          'Origin': window.location.origin
+          'Content-Type': 'application/json',
         },
         mode: 'cors',
+        credentials: 'omit'
       });
 
       console.log('Response status:', response.status);

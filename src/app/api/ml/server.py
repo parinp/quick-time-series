@@ -28,10 +28,13 @@ app.add_middleware(
         "https://quick-time-series.vercel.app",  # Vercel production
         "https://quick-time-series-git-main.vercel.app",  # Vercel main branch
         "https://quick-time-series-git-*.vercel.app",  # Vercel preview deployments
+        "https://simple-timeseries-analysis.onrender.com",  # Render domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
 
 # Define request model
