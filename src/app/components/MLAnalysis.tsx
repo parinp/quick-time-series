@@ -229,6 +229,9 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
                   </IconButton>
                 </Tooltip>
               </Box>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                <strong>Feature Importance:</strong> Shows the average impact of each feature on the model's predictions. Features are ordered by importance, with the most important at the top. The percentage indicates how much each feature contributes to the model's decisions.
+              </Typography>
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <img 
                   src={`data:image/png;base64,${shap_plots.bar_plot}`} 
@@ -252,6 +255,15 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
                   </IconButton>
                 </Tooltip>
               </Box>
+              <Typography variant="body2" sx={{ mb: 2 }}>
+                <strong>Summary Plot:</strong> Shows the impact of each feature on the model output. Features are ordered by importance, with the most important at the top. Points to the right indicate a positive impact (increasing the prediction), while points to the left indicate a negative impact (decreasing the prediction).
+              </Typography>
+              <Typography variant="subtitle2" gutterBottom>Colors:</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                <Chip label="High Feature Value" sx={{ bgcolor: '#ff0000', color: 'white' }} />
+                <Chip label="Medium Feature Value" sx={{ bgcolor: '#ff7f7f', color: 'black' }} />
+                <Chip label="Low Feature Value" sx={{ bgcolor: '#0000ff', color: 'white' }} />
+              </Box>
               <Box sx={{ mt: 2, textAlign: 'center' }}>
                 <img 
                   src={`data:image/png;base64,${shap_plots.beeswarm_plot}`} 
@@ -262,36 +274,42 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             </Paper>
           </Grid>
           
-          {/* Waterfall Plots - Multiple examples */}
+          {/* Force Plots - Multiple examples */}
           <Grid item xs={12}>
             <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                 <Typography variant="subtitle1">
                   SHAP Force Plots (Sample Predictions)
                 </Typography>
-                <Tooltip title="Force plots show how each feature pushes the prediction higher (red) or lower (blue) from the base value.">
+                <Tooltip title={shapDescriptions.force}>
                   <IconButton size="small" sx={{ color: 'white' }}>
                     <InfoIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
               </Box>
               
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                These plots show how each feature contributes to predictions for low, medium, and high sales examples. Red pushes the prediction higher, blue pushes it lower.
+              <Typography variant="body2" sx={{ mb: 1 }}>
+                <strong>Force Plot:</strong> Shows how each feature pushes the prediction higher or lower from the base value (average prediction). The width of each arrow indicates the magnitude of the effect.
               </Typography>
               
-              <Grid container spacing={2} direction="column">
+              <Typography variant="subtitle2" gutterBottom>Colors:</Typography>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                <Chip label="Increases Prediction" sx={{ bgcolor: '#ff0000', color: 'white' }} />
+                <Chip label="Decreases Prediction" sx={{ bgcolor: '#0000ff', color: 'white' }} />
+              </Box>
+              
+              <Grid container spacing={3} direction="column">
                 {/* Low Sales Example */}
                 <Grid item xs={12}>
                   <Box sx={{ border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 1, p: 2 }}>
                     <Typography variant="subtitle2" align="center" gutterBottom>
                       Low Sales Example
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', minHeight: '180px' }}>
                       <img 
                         src={`data:image/png;base64,${shap_plots.waterfall_plot_low}`} 
                         alt="SHAP Force Plot - Low Sales" 
-                        style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: 'none' }}
                       />
                     </Box>
                   </Box>
@@ -303,11 +321,11 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
                     <Typography variant="subtitle2" align="center" gutterBottom>
                       Medium Sales Example
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', minHeight: '180px' }}>
                       <img 
                         src={`data:image/png;base64,${shap_plots.waterfall_plot_medium}`} 
                         alt="SHAP Force Plot - Medium Sales" 
-                        style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: 'none' }}
                       />
                     </Box>
                   </Box>
@@ -319,11 +337,11 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
                     <Typography variant="subtitle2" align="center" gutterBottom>
                       High Sales Example
                     </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', minHeight: '180px' }}>
                       <img 
                         src={`data:image/png;base64,${shap_plots.waterfall_plot_high}`} 
                         alt="SHAP Force Plot - High Sales" 
-                        style={{ width: '100%', height: 'auto', objectFit: 'contain' }}
+                        style={{ width: '100%', height: 'auto', objectFit: 'contain', maxHeight: 'none' }}
                       />
                     </Box>
                   </Box>
@@ -332,38 +350,6 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             </Paper>
           </Grid>
         </Grid>
-        
-        <Accordion sx={{ mt: 3, bgcolor: '#1a1f2c', color: 'white' }} defaultExpanded={true}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon sx={{ color: 'white' }} />}>
-            <Typography>Understanding SHAP Plots</Typography>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Typography variant="body2" paragraph>
-              In SHAP plots, colors represent different things depending on the plot type:
-            </Typography>
-            
-            <Typography variant="subtitle2" gutterBottom>Summary Plot Colors:</Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-              <Chip label="High Feature Value" sx={{ bgcolor: '#ff0000', color: 'white' }} />
-              <Chip label="Medium Feature Value" sx={{ bgcolor: '#ff7f7f', color: 'black' }} />
-              <Chip label="Low Feature Value" sx={{ bgcolor: '#0000ff', color: 'white' }} />
-            </Box>
-            
-            <Typography variant="subtitle2" gutterBottom>Force Plot Colors:</Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
-              <Chip label="Increases Prediction" sx={{ bgcolor: '#ff0000', color: 'white' }} />
-              <Chip label="Decreases Prediction" sx={{ bgcolor: '#0000ff', color: 'white' }} />
-            </Box>
-            
-            <Typography variant="body2" paragraph>
-              <strong>Summary Plot:</strong> Shows the impact of each feature on the model output. Features are ordered by importance, with the most important at the top. Points to the right indicate a positive impact (increasing the prediction), while points to the left indicate a negative impact (decreasing the prediction).
-            </Typography>
-            
-            <Typography variant="body2">
-              <strong>Force Plot:</strong> Shows how each feature pushes the prediction higher or lower from the base value (average prediction). Red arrows push the prediction higher, blue arrows push it lower. The width of each arrow indicates the magnitude of the effect.
-            </Typography>
-          </AccordionDetails>
-        </Accordion>
       </Box>
     );
   };
