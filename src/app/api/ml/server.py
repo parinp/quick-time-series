@@ -40,6 +40,7 @@ class AnalysisRequest(BaseModel):
     data: List[Dict[str, Any]]
     dateColumn: str
     targetColumn: str
+    multipleWaterfallPlots: bool = False
 
 # Define API endpoints
 @app.post("/analyze")
@@ -54,10 +55,10 @@ async def analyze(request: AnalysisRequest):
         Analysis results including metrics, feature importance, and SHAP plots
     """
     try:
-        logger.info(f"Analyzing data with {len(request.data)} records, date column: {request.dateColumn}, target column: {request.targetColumn}")
+        logger.info(f"Analyzing data with {len(request.data)} records, date column: {request.dateColumn}, target column: {request.targetColumn}, multiple waterfall plots: {request.multipleWaterfallPlots}")
         
         # Analyze the data
-        results = analyze_data(request.data, request.dateColumn, request.targetColumn)
+        results = analyze_data(request.data, request.dateColumn, request.targetColumn, request.multipleWaterfallPlots)
         
         return results
     

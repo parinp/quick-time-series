@@ -92,18 +92,20 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
         'metrics': metrics
     }
 
-def generate_shap_plots(model_data: Dict[str, Any]):
+def generate_shap_plots(model_data: Dict[str, Any], multiple_waterfall_plots: bool = False):
     """
     Generate SHAP plots for the trained model.
     
     Args:
         model_data: Dictionary containing model and data from train_xgboost_model
+        multiple_waterfall_plots: Whether to generate multiple waterfall plots for different examples
         
     Returns:
         Dictionary containing base64-encoded plot images
     """
     model = model_data['model']
     X_test = model_data['X_test']
+    y_test = model_data['y_test']
     
     # Create a SHAP explainer
     explainer = shap.Explainer(model)
@@ -139,7 +141,7 @@ def generate_shap_plots(model_data: Dict[str, Any]):
     plt.close()
     plots['beeswarm_plot'] = base64.b64encode(buf.getvalue()).decode('utf-8')
     
-    # 4. Waterfall plot for first instance
+    # 4. Waterfall plot for first instance (keep for backward compatibility)
     plt.figure(figsize=(10, 8))
     shap.plots.waterfall(shap_values[0], show=False)
     buf = BytesIO()
@@ -147,6 +149,50 @@ def generate_shap_plots(model_data: Dict[str, Any]):
     plt.savefig(buf, format='png', dpi=100)
     plt.close()
     plots['waterfall_plot'] = base64.b64encode(buf.getvalue()).decode('utf-8')
+    
+    # 5. Multiple waterfall plots for different examples if requested
+    if multiple_waterfall_plots:
+        # Get predictions for all test instances
+        y_pred = model.predict(X_test)
+        
+        # Find indices for low, medium, and high predictions
+        sorted_indices = np.argsort(y_pred)
+        n_samples = len(sorted_indices)
+        
+        # Get indices for low (10th percentile), medium (50th percentile), and high (90th percentile)
+        low_idx = sorted_indices[int(n_samples * 0.1)]
+        med_idx = sorted_indices[int(n_samples * 0.5)]
+        high_idx = sorted_indices[int(n_samples * 0.9)]
+        
+        # Generate waterfall plot for low sales example
+        plt.figure(figsize=(12, 10))
+        plt.title(f"Low Sales Example (Predicted: {y_pred[low_idx]:.2f}, Actual: {y_test.iloc[low_idx]:.2f})")
+        shap.plots.waterfall(shap_values[low_idx], show=False, max_display=8)
+        buf = BytesIO()
+        plt.tight_layout(pad=2.0)
+        plt.savefig(buf, format='png', dpi=100)
+        plt.close()
+        plots['waterfall_plot_low'] = base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+        # Generate waterfall plot for medium sales example
+        plt.figure(figsize=(12, 10))
+        plt.title(f"Medium Sales Example (Predicted: {y_pred[med_idx]:.2f}, Actual: {y_test.iloc[med_idx]:.2f})")
+        shap.plots.waterfall(shap_values[med_idx], show=False, max_display=8)
+        buf = BytesIO()
+        plt.tight_layout(pad=2.0)
+        plt.savefig(buf, format='png', dpi=100)
+        plt.close()
+        plots['waterfall_plot_medium'] = base64.b64encode(buf.getvalue()).decode('utf-8')
+        
+        # Generate waterfall plot for high sales example
+        plt.figure(figsize=(12, 10))
+        plt.title(f"High Sales Example (Predicted: {y_pred[high_idx]:.2f}, Actual: {y_test.iloc[high_idx]:.2f})")
+        shap.plots.waterfall(shap_values[high_idx], show=False, max_display=8)
+        buf = BytesIO()
+        plt.tight_layout(pad=2.0)
+        plt.savefig(buf, format='png', dpi=100)
+        plt.close()
+        plots['waterfall_plot_high'] = base64.b64encode(buf.getvalue()).decode('utf-8')
     
     return {
         'plots': plots
@@ -179,7 +225,7 @@ def get_feature_importance(model_data: Dict[str, Any]):
     
     return feature_importance
 
-def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: str):
+def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: str, multiple_waterfall_plots: bool = False):
     """
     Analyze the data using XGBoost and SHAP.
     
@@ -187,6 +233,7 @@ def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: st
         data: List of dictionaries containing the data
         date_column: Name of the date column
         target_column: Name of the target column
+        multiple_waterfall_plots: Whether to generate multiple waterfall plots for different examples
         
     Returns:
         Dictionary containing analysis results
@@ -206,7 +253,7 @@ def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: st
         model_data = train_xgboost_model(data, date_column, target_column)
         
         # Generate SHAP plots
-        shap_data = generate_shap_plots(model_data)
+        shap_data = generate_shap_plots(model_data, multiple_waterfall_plots)
         
         # Get feature importance
         feature_importance = get_feature_importance(model_data)
