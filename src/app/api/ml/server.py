@@ -23,7 +23,12 @@ app = FastAPI(
 # Add CORS middleware to allow cross-origin requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=[
+        "http://localhost:3000",  # Local development
+        "https://quick-time-series.vercel.app",  # Vercel production
+        "https://quick-time-series-git-main.vercel.app",  # Vercel main branch
+        "https://quick-time-series-git-*.vercel.app",  # Vercel preview deployments
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
