@@ -69,10 +69,14 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   useEffect(() => {
     const checkApi = async () => {
       setCheckingApi(true);
+      console.log('Checking API availability...');
+      console.log('API URL:', process.env.NEXT_PUBLIC_ML_API_URL);
       try {
         const isAvailable = await checkApiHealth();
+        console.log('API availability result:', isAvailable);
         setApiAvailable(isAvailable);
       } catch (err) {
+        console.error('Error in API check:', err);
         setApiAvailable(false);
       } finally {
         setCheckingApi(false);

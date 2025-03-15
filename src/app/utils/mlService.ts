@@ -83,21 +83,36 @@ export async function analyzeData(
  * @returns Promise with the health check result
  */
 export async function checkApiHealth(): Promise<boolean> {
-  try {
-    const response = await fetch(`${API_BASE_URL}/health`, {
-      method: 'GET',
-    });
+  const maxRetries = 3;
+  const retryDelay = 2000; // 2 seconds
 
-    if (!response.ok) {
-      return false;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`Checking API health (attempt ${attempt + 1}/${maxRetries})...`);
+      const response = await fetch(`${API_BASE_URL}/health`, {
+        method: 'GET',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return data.status === 'healthy';
+      }
+
+      // If not successful and not last attempt, wait before retrying
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    } catch (error) {
+      console.error(`Error checking API health (attempt ${attempt + 1}):`, error);
+      
+      // If not last attempt, wait before retrying
+      if (attempt < maxRetries - 1) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
     }
-
-    const data = await response.json();
-    return data.status === 'healthy';
-  } catch (error) {
-    console.error('Error checking API health:', error);
-    return false;
   }
+
+  return false;
 }
 
 /**
