@@ -5,10 +5,8 @@ services:
     plan: free
     rootDir: src/app/api/ml
     buildCommand: |
-      cd ../../..
-      pip install -r requirements.txt
-      cd src/app/api/ml
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+      pip install -r ../../../requirements.txt
+    startCommand: python -m uvicorn server:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9
