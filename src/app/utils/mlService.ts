@@ -22,6 +22,9 @@ export interface MLAnalysisResults {
     bar_plot: string;
     beeswarm_plot: string;
     waterfall_plot: string;
+    waterfall_plot_low?: string;
+    waterfall_plot_medium?: string;
+    waterfall_plot_high?: string;
   };
   timestamp: string;
 }
@@ -32,12 +35,14 @@ export interface MLAnalysisResults {
  * @param data The time series data to analyze
  * @param dateColumn The name of the date column
  * @param targetColumn The name of the target column
+ * @param multipleWaterfallPlots Whether to generate multiple waterfall plots for different examples
  * @returns Promise with the analysis results
  */
 export async function analyzeData(
   data: TimeSeriesData[],
   dateColumn: string,
-  targetColumn: string
+  targetColumn: string,
+  multipleWaterfallPlots: boolean = false
 ): Promise<MLAnalysisResults> {
   try {
     const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -52,6 +57,7 @@ export async function analyzeData(
         data,
         dateColumn,
         targetColumn,
+        multipleWaterfallPlots
       }),
     });
 
