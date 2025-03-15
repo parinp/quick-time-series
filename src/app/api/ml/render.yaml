@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: ml-analysis-api
+    name: simple-timeseries-analysis
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -10,8 +10,10 @@ services:
         value: 3.9
       - key: PORT
         value: 8080
+      - key: ENVIRONMENT
+        value: production
     autoDeploy: true
     healthCheckPath: /health
     numInstances: 1
     domains:
-      - ml-analysis-api.onrender.com 
+      - simple-timeseries-analysis.onrender.com 
