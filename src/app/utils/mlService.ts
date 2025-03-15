@@ -170,5 +170,11 @@ export function getShapDescriptions() {
       It starts with the base value (average prediction) and shows how each feature pushes the 
       prediction higher or lower. The final prediction is shown at the bottom.
     `,
+    force: `
+      The SHAP force plot shows how each feature pushes the prediction higher or lower from the base value.
+      Red arrows push the prediction higher, blue arrows push it lower.
+      The width of each arrow indicates the magnitude of the effect.
+      This compact visualization helps understand how features interact to produce the final prediction.
+    `
   };
 } 
