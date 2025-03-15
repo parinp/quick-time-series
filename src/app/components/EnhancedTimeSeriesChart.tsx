@@ -476,7 +476,9 @@ const EnhancedTimeSeriesChart: React.FC<EnhancedTimeSeriesChartProps> = ({
                 TOTAL {valueField.toUpperCase()}
               </Typography>
               <Typography variant="h3" component="div" sx={{ mt: 1, fontWeight: 'bold' }}>
-                {stats.total.toLocaleString()}
+                {stats.total >= 1000000 
+                  ? `${(stats.total / 1000000).toFixed(2)}M` 
+                  : stats.total.toLocaleString()}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                 <Chip 
@@ -498,7 +500,7 @@ const EnhancedTimeSeriesChart: React.FC<EnhancedTimeSeriesChartProps> = ({
                 AVERAGE {valueField.toUpperCase()}
               </Typography>
               <Typography variant="h3" component="div" sx={{ mt: 1, fontWeight: 'bold' }}>
-                {stats.average.toFixed(2)}
+                {stats.average.toLocaleString(undefined, { maximumFractionDigits: 2 })}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                 <Chip 
