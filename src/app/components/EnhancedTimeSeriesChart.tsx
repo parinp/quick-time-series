@@ -500,7 +500,9 @@ const EnhancedTimeSeriesChart: React.FC<EnhancedTimeSeriesChartProps> = ({
                 AVERAGE {valueField.toUpperCase()}
               </Typography>
               <Typography variant="h3" component="div" sx={{ mt: 1, fontWeight: 'bold' }}>
-                {stats.average.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                {stats.average >= 1000000 
+                  ? `${(stats.average / 1000000).toFixed(2)}M` 
+                  : stats.average.toLocaleString()}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
                 <Chip 
