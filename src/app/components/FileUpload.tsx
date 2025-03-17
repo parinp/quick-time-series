@@ -18,7 +18,7 @@ interface FileUploadProps {
 }
 
 // Maximum file size (40MB)
-const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB in bytes
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
 
 const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -33,7 +33,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
 
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
-      setError(`File size exceeds the 40MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      setError(`File size exceeds the 5MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
       return;
     }
 
@@ -113,9 +113,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center',
-        border: '2px dashed #ccc',
+        border: '2px dashed rgba(0, 179, 255, 0.5)',
         borderRadius: 2,
-        backgroundColor: '#fafafa',
+        backgroundColor: 'rgba(17, 24, 39, 0.8)',
         mb: 4
       }}
     >
@@ -129,16 +129,18 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
       
       <CloudUploadIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
       
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" gutterBottom color="primary.main">
         Upload Time Series Data
       </Typography>
       
-      <Typography variant="body1" color="textSecondary" align="center" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.primary" align="center" sx={{ mb: 3 }}>
         Upload a CSV file containing your time series data.
         <br />
         The file should include at least one date column and one numeric column.
         <br />
-        <strong>Maximum file size: 40MB</strong>
+        <Box component="span" sx={{ color: 'primary.light', fontWeight: 'bold' }}>
+          Maximum file size: 5MB
+        </Box>
       </Typography>
       
       <Button 
@@ -155,7 +157,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
       {isLoading && (
         <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
           <LinearProgress variant="determinate" value={uploadProgress} />
-          <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 1 }}>
+          <Typography variant="body2" color="primary.light" align="center" sx={{ mt: 1 }}>
             {uploadProgress}% Uploaded
           </Typography>
         </Box>

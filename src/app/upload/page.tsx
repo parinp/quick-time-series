@@ -60,14 +60,14 @@ export default function UploadPage() {
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
+      <Typography variant="h4" component="h1" gutterBottom color="primary.main">
         Upload Your Time Series Data
       </Typography>
       
-      <Typography variant="body1" paragraph>
+      <Typography variant="body1" paragraph color="text.primary">
         Upload a CSV file containing your time series data for analysis and visualization. 
         The file should include at least one date column and one numeric column for analysis.
-        Maximum file size: 40MB.
+        Maximum file size: 5MB.
       </Typography>
       
       {!isDataLoaded && (
@@ -76,11 +76,11 @@ export default function UploadPage() {
       
       {isDataLoaded && !isAnalyzing && data.length > 0 && (
         <>
-          <Paper sx={{ p: 3, mb: 4, bgcolor: '#e8f5e9' }}>
+          <Paper sx={{ p: 3, mb: 4, bgcolor: 'rgba(0, 227, 150, 0.1)', borderLeft: '4px solid', borderColor: 'success.main' }}>
             <Typography variant="h6" gutterBottom color="success.main">
               Data Successfully Loaded
             </Typography>
-            <Typography variant="body1">
+            <Typography variant="body1" color="text.primary">
               Your data has been loaded successfully. Please select the date column and target column for analysis.
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -104,11 +104,11 @@ export default function UploadPage() {
       )}
       
       {isDataLoaded && data.length === 0 && (
-        <Paper sx={{ p: 3, mb: 4, bgcolor: '#ffebee' }}>
+        <Paper sx={{ p: 3, mb: 4, bgcolor: 'rgba(255, 69, 96, 0.1)', borderLeft: '4px solid', borderColor: 'error.main' }}>
           <Typography variant="h6" gutterBottom color="error">
             Error Loading Data
           </Typography>
-          <Typography variant="body1">
+          <Typography variant="body1" color="text.primary">
             The data was loaded but appears to be empty. Please try uploading a different file.
           </Typography>
         </Paper>
