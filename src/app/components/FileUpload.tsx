@@ -12,13 +12,14 @@ import {
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { TimeSeriesData } from '../utils/types';
+import { uploadCSV } from '../utils/apiClient';
 
 interface FileUploadProps {
   onDataLoaded: (data: TimeSeriesData[], datasetId?: string) => void;
 }
 
-// Maximum file size (40MB)
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+// Maximum file size (50MB)
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
 
 const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -33,7 +34,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
 
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
-      setError(`File size exceeds the 5MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      setError(`File size exceeds the 50MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
       return;
     }
 
@@ -49,131 +50,127 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
     setUploadProgress(0);
 
     try {
-      // Create form data
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // Upload file to API
-      const response = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData
-      });
-
-      // Update progress manually since fetch doesn't support progress tracking
-      setUploadProgress(100);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload file');
-      }
-
-      const result = await response.json();
+      // Upload the file with fixed 15-minute TTL
+      const response = await uploadCSV(file);
       
-      if (result.success) {
-        // Fetch the processed data
-        const dataResponse = await fetch(`/api/data/${result.datasetId}`);
-        
-        if (!dataResponse.ok) {
-          const errorData = await dataResponse.json();
-          throw new Error('Failed to retrieve processed data');
-        }
-        
-        const dataResult = await dataResponse.json();
-        
-        if (dataResult.success) {
-          // Make sure we're passing an array to onDataLoaded
-          if (dataResult.data && Array.isArray(dataResult.data) && dataResult.data.length > 0) {
-            onDataLoaded(dataResult.data, result.datasetId);
-          } else {
-            throw new Error('Invalid data format received from server');
+      // Simulate progress for now (in a real implementation, we would use a proper upload progress event)
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => {
+          if (prev >= 95) {
+            clearInterval(progressInterval);
+            return prev;
           }
-          
-          setIsLoading(false);
-        } else {
-          throw new Error(dataResult.error || 'Failed to process data');
-        }
+          return prev + 5;
+        });
+      }, 100);
+      
+      // Once we have the dataset ID, we can query for the data
+      if (response.success && response.dataset_id) {
+        // Set progress to 100% when done
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        
+        // Pass the dataset ID to the parent component
+        // The actual data will be loaded when needed through the query API
+        onDataLoaded([], response.dataset_id);
       } else {
-        throw new Error(result.error || 'Failed to upload file');
+        throw new Error('Failed to upload file');
       }
     } catch (err) {
-      setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      console.error('Error uploading file:', err);
+      setError(err instanceof Error ? err.message : 'Failed to upload file');
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    
+    const files = event.dataTransfer.files;
+    if (files.length > 0 && fileInputRef.current) {
+      fileInputRef.current.files = files;
+      handleFileChange({ target: { files } } as React.ChangeEvent<HTMLInputElement>);
+    }
   };
 
   return (
     <Paper 
-      elevation={3} 
       sx={{ 
-        p: 4, 
-        display: 'flex', 
-        flexDirection: 'column', 
-        alignItems: 'center',
-        border: '2px dashed rgba(0, 179, 255, 0.5)',
-        borderRadius: 2,
-        backgroundColor: 'rgba(17, 24, 39, 0.8)',
-        mb: 4
+        p: 3, 
+        mb: 4, 
+        bgcolor: 'background.paper',
+        border: '2px dashed',
+        borderColor: 'primary.main',
+        borderRadius: 2
       }}
     >
-      <input
-        type="file"
-        accept=".csv"
-        onChange={handleFileChange}
-        ref={fileInputRef}
-        style={{ display: 'none' }}
-      />
-      
-      <CloudUploadIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-      
-      <Typography variant="h5" gutterBottom color="primary.main">
-        Upload Time Series Data
-      </Typography>
-      
-      <Typography variant="body1" color="text.primary" align="center" sx={{ mb: 3 }}>
-        Upload a CSV file containing your time series data.
-        <br />
-        The file should include at least one date column and one numeric column.
-        <br />
-        <Box component="span" sx={{ color: 'primary.light', fontWeight: 'bold' }}>
-          Maximum file size: 5MB
-        </Box>
-      </Typography>
-      
-      <Button 
-        variant="contained" 
-        color="primary" 
-        onClick={handleButtonClick}
-        disabled={isLoading}
-        startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : undefined}
-        sx={{ mb: 2 }}
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          py: 3
+        }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
       >
-        {isLoading ? 'Uploading...' : 'Select CSV File'}
-      </Button>
-      
-      {isLoading && (
-        <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
-          <LinearProgress variant="determinate" value={uploadProgress} />
-          <Typography variant="body2" color="primary.light" align="center" sx={{ mt: 1 }}>
-            {uploadProgress}% Uploaded
+        <CloudUploadIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+        
+        <Typography variant="h6" gutterBottom>
+          Upload CSV File
+        </Typography>
+        
+        <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 2 }}>
+          Drag and drop a CSV file here, or click to select a file.
+          <br />
+          Maximum file size: 50MB
+          <br />
+          <em>Data will be available for 15 minutes after upload</em>
+        </Typography>
+        
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+          ref={fileInputRef}
+        />
+        
+        <Button
+          variant="contained"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isLoading}
+          startIcon={isLoading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
+        >
+          {isLoading ? 'Uploading...' : 'Select CSV File'}
+        </Button>
+        
+        {fileName && (
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Selected file: {fileName}
           </Typography>
-        </Box>
-      )}
-      
-      {fileName && !error && !isLoading && (
-        <Alert severity="success" sx={{ mt: 2, width: '100%' }}>
-          Successfully uploaded: {fileName}
-        </Alert>
-      )}
-      
-      {error && (
-        <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
-          {error}
-        </Alert>
-      )}
+        )}
+        
+        {uploadProgress > 0 && (
+          <Box sx={{ width: '100%', mt: 2 }}>
+            <LinearProgress variant="determinate" value={uploadProgress} />
+            <Typography variant="body2" align="center" sx={{ mt: 1 }}>
+              {uploadProgress < 100 ? 'Uploading...' : 'Processing...'} {uploadProgress}%
+            </Typography>
+          </Box>
+        )}
+        
+        {error && (
+          <Alert severity="error" sx={{ mt: 2, width: '100%' }}>
+            {error}
+          </Alert>
+        )}
+      </Box>
     </Paper>
   );
 };
