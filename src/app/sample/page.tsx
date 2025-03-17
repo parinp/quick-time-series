@@ -37,16 +37,32 @@ export default function SamplePage() {
     }
   }, [storeList]);
   
+  // Ensure default columns are set for sample data
+  React.useEffect(() => {
+    if (!isLoading && allData.length > 0) {
+      const columns = Object.keys(allData[0]);
+      
+      // If date column is not set, try to set it to 'date'
+      if (!dateColumn && columns.includes('date')) {
+        setDateColumn('date');
+      }
+      
+      // If target column is not set, try to set it to 'sales'
+      if (!targetColumn && columns.includes('sales')) {
+        setTargetColumn('sales');
+      }
+    }
+  }, [isLoading, allData, dateColumn, targetColumn, setDateColumn, setTargetColumn]);
+  
   // Auto-analyze with default columns when data is loaded
   React.useEffect(() => {
-    if (!isLoading && allData.length > 0 && !isAnalyzing) {
+    if (!isLoading && allData.length > 0 && !isAnalyzing && dateColumn && targetColumn) {
       setIsAnalyzing(true);
     }
-  }, [isLoading, allData, isAnalyzing]);
+  }, [isLoading, allData, isAnalyzing, dateColumn, targetColumn]);
 
   const handleStoreChange = (event: SelectChangeEvent) => {
     const storeId = event.target.value;
-    console.log('Store selected from dropdown:', storeId);
     setSelectedStore(storeId);
   };
 
@@ -54,7 +70,6 @@ export default function SamplePage() {
     if (directStoreInput) {
       const storeNum = parseInt(directStoreInput, 10);
       if (!isNaN(storeNum) && storeNum > 0) {
-        console.log('Setting store ID to:', storeNum);
         setSelectedStore(storeNum.toString());
       } else {
         console.error('Invalid store ID:', directStoreInput);
@@ -164,6 +179,30 @@ export default function SamplePage() {
         <Paper sx={{ p: 3, bgcolor: '#ffebee', color: '#c62828', my: 4 }}>
           <Typography variant="h6">Error</Typography>
           <Typography variant="body1">{error}</Typography>
+        </Paper>
+      ) : storeFilteredData.length === 0 ? (
+        <Paper sx={{ p: 3, bgcolor: '#ffebee', color: '#c62828', my: 4 }}>
+          <Typography variant="h6">Missing required data or columns</Typography>
+          <Typography variant="body1">
+            No data available for the selected store. Please select a different store.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 2 }}>
+            Debug info: Date column: "{dateColumn}", Target column: "{targetColumn}", Data length: {storeFilteredData.length}
+          </Typography>
+          <Box sx={{ mt: 2 }}>
+            <Button 
+              variant="contained" 
+              color="primary"
+              onClick={() => {
+                // Reset to default store
+                setSelectedStore('all');
+                // Reset analysis state
+                setIsAnalyzing(false);
+              }}
+            >
+              Reset to All Stores
+            </Button>
+          </Box>
         </Paper>
       ) : (
         <>

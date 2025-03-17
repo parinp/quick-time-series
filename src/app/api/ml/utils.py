@@ -29,10 +29,27 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     # Convert to DataFrame
     df = pd.DataFrame(data)
     
+    print(f"Training XGBoost model with date column: '{date_column}' and target column: '{target_column}'")
+    print(f"DataFrame columns: {df.columns.tolist()}")
+    
+    # Verify columns exist
+    if date_column not in df.columns:
+        raise ValueError(f"Date column '{date_column}' not found in data. Available columns: {', '.join(df.columns)}")
+    
+    if target_column not in df.columns:
+        raise ValueError(f"Target column '{target_column}' not found in data. Available columns: {', '.join(df.columns)}")
+    
     # Convert date column to datetime
-    df[date_column] = pd.to_datetime(df[date_column])
+    try:
+        df[date_column] = pd.to_datetime(df[date_column])
+        print(f"Successfully converted '{date_column}' to datetime")
+    except Exception as e:
+        print(f"Error converting '{date_column}' to datetime: {str(e)}")
+        print(f"Sample values: {df[date_column].head().tolist()}")
+        raise ValueError(f"Could not convert '{date_column}' to datetime. Make sure it contains valid date values.")
     
     # Extract features from date
+    # print(f"Extracting time features from '{date_column}'")
     # df['year'] = df[date_column].dt.year
     # df['month'] = df[date_column].dt.month
     # df['day'] = df[date_column].dt.day
@@ -43,18 +60,25 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     features = df.drop([date_column, target_column], axis=1)
     target = df[target_column]
     
+    print(f"Feature columns: {features.columns.tolist()}")
+    print(f"Target column: '{target_column}' with {len(target)} values")
+    
     # Handle categorical columns
     # First, identify categorical columns (object dtype)
     categorical_columns = features.select_dtypes(include=['object']).columns.tolist()
     
-    # Convert categorical columns to numeric using one-hot encoding
     if categorical_columns:
+        print(f"Found categorical columns: {categorical_columns}")
+        # Convert categorical columns to numeric using one-hot encoding
         features = pd.get_dummies(features, columns=categorical_columns, drop_first=True)
+        print(f"After one-hot encoding, feature columns: {features.columns.tolist()}")
     
     # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
         features, target, test_size=test_size, random_state=random_state
     )
+    
+    print(f"Training set size: {len(X_train)}, Test set size: {len(X_test)}")
     
     # Train the XGBoost model
     model = xgb.XGBRegressor(
@@ -81,6 +105,8 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
         'train_r2': float(train_r2),
         'test_r2': float(test_r2)
     }
+    
+    print(f"Model metrics: {metrics}")
     
     return {
         'model': model,

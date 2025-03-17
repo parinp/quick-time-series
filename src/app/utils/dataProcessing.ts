@@ -21,20 +21,59 @@ export const parseCSV = (csvData: string) => {
 export const detectDateColumns = (data: any[]) => {
   if (!data || data.length === 0) return [];
   
-  const sampleRow = data[0];
+  const sampleRows = data.slice(0, Math.min(5, data.length)); // Check first 5 rows
   const potentialDateColumns: string[] = [];
+  const columnCounts: Record<string, number> = {};
   
-  for (const key in sampleRow) {
-    const value = sampleRow[key];
-    if (typeof value === 'string') {
-      // Check if the string can be parsed as a date
-      const date = new Date(value);
-      if (!isNaN(date.getTime())) {
-        potentialDateColumns.push(key);
+  // Check column names first - common date column names
+  const commonDateColumnNames = ['date', 'time', 'timestamp', 'datetime', 'day', 'month', 'year'];
+  
+  // Check each row
+  for (const row of sampleRows) {
+    for (const key in row) {
+      // Skip if already identified as a date column
+      if (potentialDateColumns.includes(key)) continue;
+      
+      // Check if column name contains common date terms
+      const keyLower = key.toLowerCase();
+      if (commonDateColumnNames.some(term => keyLower.includes(term))) {
+        if (!columnCounts[key]) columnCounts[key] = 0;
+        columnCounts[key]++;
+      }
+      
+      const value = row[key];
+      
+      // Check string values
+      if (typeof value === 'string') {
+        // Try to parse as date
+        try {
+          const date = new Date(value);
+          if (!isNaN(date.getTime())) {
+            if (!columnCounts[key]) columnCounts[key] = 0;
+            columnCounts[key]++;
+          }
+        } catch (e) {
+          // Not a valid date
+        }
+      }
+      
+      // Check if it's already a Date object
+      if (value instanceof Date) {
+        if (!columnCounts[key]) columnCounts[key] = 0;
+        columnCounts[key]++;
       }
     }
   }
   
+  // Add columns that were identified as dates in at least half the sample rows
+  const threshold = Math.ceil(sampleRows.length / 2);
+  for (const key in columnCounts) {
+    if (columnCounts[key] >= threshold) {
+      potentialDateColumns.push(key);
+    }
+  }
+  
+  console.log('Detected date columns:', potentialDateColumns);
   return potentialDateColumns;
 };
 

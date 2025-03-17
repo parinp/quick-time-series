@@ -27,6 +27,7 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "http://localhost:8000",  # Local API development
         "https://simple-timeseries-analysis.vercel.app",  # Vercel production
+        "*",  # Allow all origins during development
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -55,7 +56,14 @@ async def analyze(request: AnalysisRequest):
         Analysis results including metrics, feature importance, and SHAP plots
     """
     try:
-        logger.info(f"Analyzing data with {len(request.data)} records, date column: {request.dateColumn}, target column: {request.targetColumn}, multiple waterfall plots: {request.multipleWaterfallPlots}")
+        logger.info(f"Analyzing data with {len(request.data)} records")
+        logger.info(f"Date column: {request.dateColumn}")
+        logger.info(f"Target column: {request.targetColumn}")
+        logger.info(f"Multiple waterfall plots: {request.multipleWaterfallPlots}")
+        
+        if len(request.data) > 0:
+            sample_row = request.data[0]
+            logger.info(f"Available columns: {list(sample_row.keys())}")
         
         # Analyze the data
         results = analyze_data(request.data, request.dateColumn, request.targetColumn, request.multipleWaterfallPlots)

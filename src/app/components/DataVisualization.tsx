@@ -30,6 +30,7 @@ import EnhancedTimeSeriesChart from './EnhancedTimeSeriesChart';
 import { format, getYear, parseISO } from 'date-fns';
 import { Data } from 'plotly.js';
 import MLAnalysis from './MLAnalysis';
+import { useData } from '../utils/DataContext';
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -45,10 +46,19 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   dateColumn, 
   targetColumn 
 }) => {
+  // Try to use DataContext for fallback values
+  const dataContext = useData();
+  
+  // Use the props values, but if they're empty and we're using sample data, fall back to context values
+  const effectiveDateColumn = dateColumn || (dataContext?.isSampleData ? dataContext?.dateColumn : '');
+  const effectiveTargetColumn = targetColumn || (dataContext?.isSampleData ? dataContext?.targetColumn : '');
+  
   console.log('DataVisualization component rendering with:', {
     dataLength: data?.length,
     dateColumn,
     targetColumn,
+    effectiveDateColumn,
+    effectiveTargetColumn,
     sampleRow: data && data.length > 0 ? data[0] : null
   });
 
@@ -69,16 +79,33 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
 
   // Process the data when it changes
   useEffect(() => {
-    if (!data || data.length === 0 || !dateColumn || !targetColumn) {
-      console.log('Missing required data or columns');
-      setError('Missing required data or columns');
+    if (!data || data.length === 0) {
+      setError('No data available');
+      return;
+    }
+    
+    if (!effectiveDateColumn || !effectiveTargetColumn) {
+      setError('Missing required columns');
       return;
     }
 
     try {
-      console.log('Processing data for visualization');
-      console.log('Data sample:', data.slice(0, 3));
-      console.log('Date column:', dateColumn, 'Target column:', targetColumn);
+      // Verify the columns exist in the data
+      const columns = Object.keys(data[0]);
+      
+      if (!columns.includes(effectiveDateColumn)) {
+        const errorMsg = `Date column "${effectiveDateColumn}" not found in data. Available columns: ${columns.join(', ')}`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      if (!columns.includes(effectiveTargetColumn)) {
+        const errorMsg = `Target column "${effectiveTargetColumn}" not found in data. Available columns: ${columns.join(', ')}`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
       
       // Ensure dates are properly formatted and values are numbers
       const processed = data.map(item => {
@@ -86,66 +113,57 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         const newItem = {...item};
         
         // Ensure date is properly formatted
-        if (typeof newItem[dateColumn] === 'string') {
+        if (typeof newItem[effectiveDateColumn] === 'string') {
           try {
             // Try to parse the date
-            const parsedDate = new Date(newItem[dateColumn]);
+            const parsedDate = new Date(newItem[effectiveDateColumn]);
             if (!isNaN(parsedDate.getTime())) {
               // If valid date, convert to Date object
-              newItem[dateColumn] = parsedDate;
+              newItem[effectiveDateColumn] = parsedDate;
             } else {
-              console.log('Invalid date found:', newItem[dateColumn]);
-              throw new Error(`Invalid date: ${newItem[dateColumn]}`);
+              console.error('Invalid date found:', newItem[effectiveDateColumn]);
+              throw new Error(`Invalid date: ${newItem[effectiveDateColumn]}`);
             }
           } catch (e) {
             console.error('Error parsing date:', e);
-            setError(`Error parsing date: ${newItem[dateColumn]}`);
+            setError(`Error parsing date: ${newItem[effectiveDateColumn]}`);
           }
-        } else if (newItem[dateColumn] instanceof Date) {
+        } else if (newItem[effectiveDateColumn] instanceof Date) {
           // Already a Date object, keep as is
-          console.log('Date is already a Date object');
         } else {
-          console.log('Date is not a string or Date object:', newItem[dateColumn]);
-          setError(`Date column contains invalid value: ${newItem[dateColumn]}`);
+          console.error('Date is not a string or Date object:', newItem[effectiveDateColumn]);
+          setError(`Date column contains invalid value: ${newItem[effectiveDateColumn]}`);
         }
         
         // Ensure target column is a number
-        if (typeof newItem[targetColumn] !== 'number') {
-          const numValue = Number(newItem[targetColumn]);
+        if (typeof newItem[effectiveTargetColumn] !== 'number') {
+          const numValue = Number(newItem[effectiveTargetColumn]);
           if (!isNaN(numValue)) {
-            newItem[targetColumn] = numValue;
+            newItem[effectiveTargetColumn] = numValue;
           } else {
-            console.log('Invalid numeric value:', newItem[targetColumn]);
-            newItem[targetColumn] = 0; // Default to 0 for invalid numbers
+            console.error('Invalid numeric value:', newItem[effectiveTargetColumn]);
+            newItem[effectiveTargetColumn] = 0; // Default to 0 for invalid numbers
           }
         }
         
         return newItem;
       });
       
-      console.log('Processed data sample:', processed.slice(0, 3));
       setProcessedData(processed);
       setDataPoints(processed.length);
       
       // Calculate total and average sales
       const numericValues = processed
-        .map(item => Number(item[targetColumn]))
+        .map(item => Number(item[effectiveTargetColumn]))
         .filter(val => !isNaN(val));
-      
-      console.log('Numeric values sample:', numericValues.slice(0, 5));
-      console.log('Numeric values count:', numericValues.length);
       
       if (numericValues.length > 0) {
         const total = numericValues.reduce((sum, val) => sum + val, 0);
         const avg = total / numericValues.length;
         
-        console.log('Total sales:', total);
-        console.log('Average sales:', avg);
-        
         setTotalSales(total);
         setAvgSales(avg);
       } else {
-        console.log('No valid numeric values found');
         setTotalSales(0);
         setAvgSales(0);
       }
@@ -153,44 +171,35 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       // Extract dates for date range
       const dates = processed
         .map(item => {
-          const dateValue = item[dateColumn];
+          const dateValue = item[effectiveDateColumn];
           return dateValue instanceof Date ? dateValue : new Date(dateValue);
         })
         .filter(date => !isNaN(date.getTime()));
       
-      console.log('Dates sample:', dates.slice(0, 5));
-      console.log('Dates count:', dates.length);
-      
       if (dates.length > 0) {
         const minDate = dates.reduce((a, b) => a < b ? a : b);
         const maxDate = dates.reduce((a, b) => a > b ? a : b);
-        
-        console.log('Min date:', minDate);
-        console.log('Max date:', maxDate);
         
         setStartDate(minDate);
         setEndDate(maxDate);
         
         // Extract years for year selection
         const years = [...new Set(dates.map(date => date.getFullYear()))].sort();
-        console.log('Available years:', years);
         
         setAvailableYears(years);
         setSelectedYears(years);
-      } else {
-        console.log('No valid dates found');
       }
       
       // Add time features
-      const dataWithTimeFeatures = addTimeFeatures(processed, dateColumn);
+      const dataWithTimeFeatures = addTimeFeatures(processed, effectiveDateColumn);
       setTimeFeatureData(dataWithTimeFeatures);
       
       // Group by month
-      const byMonth = groupBy(dataWithTimeFeatures, 'month', targetColumn, 'mean');
+      const byMonth = groupBy(dataWithTimeFeatures, 'month', effectiveTargetColumn, 'mean');
       setMonthlyData(byMonth);
       
       // Group by day of week
-      const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', targetColumn, 'mean');
+      const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', effectiveTargetColumn, 'mean');
       setDowData(byDow);
       
       setError(null);
@@ -198,7 +207,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       console.error('Error processing data:', err);
       setError(`Error processing data: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [data, dateColumn, targetColumn]);
+  }, [data, effectiveDateColumn, effectiveTargetColumn]);
 
   const handleChartChange = (event: SelectChangeEvent) => {
     setSelectedChart(event.target.value);
@@ -219,7 +228,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   const resetFilters = () => {
     if (data && data.length > 0) {
       const dates = data
-        .map(item => new Date(item[dateColumn]))
+        .map(item => new Date(item[effectiveDateColumn]))
         .filter(date => !isNaN(date.getTime()));
       
       if (dates.length > 0) {
@@ -236,10 +245,10 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     return (
       <EnhancedTimeSeriesChart
         data={processedData}
-        dateField={dateColumn}
-        valueField={targetColumn}
-        title={`${targetColumn} Over Time`}
-        description={`Analyze ${targetColumn} trends over time`}
+        dateField={effectiveDateColumn}
+        valueField={effectiveTargetColumn}
+        title={`${effectiveTargetColumn} Over Time`}
+        description={`Analyze ${effectiveTargetColumn} trends over time`}
       />
     );
   };
@@ -251,7 +260,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     const dataByYearAndMonth: Record<number, Record<number, number[]>> = {};
     
     timeFeatureData.forEach(item => {
-      const date = new Date(item[dateColumn]);
+      const date = new Date(item[effectiveDateColumn]);
       const year = date.getFullYear();
       const month = date.getMonth() + 1; // 1-indexed month
       
@@ -263,7 +272,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         dataByYearAndMonth[year][month] = [];
       }
       
-      dataByYearAndMonth[year][month].push(Number(item[targetColumn]));
+      dataByYearAndMonth[year][month].push(Number(item[effectiveTargetColumn]));
     });
     
     // Calculate average for each year and month
@@ -305,9 +314,9 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       <Plot
         data={traces as Data[]}
         layout={{
-          title: `Monthly Pattern of ${targetColumn} by Year`,
+          title: `Monthly Pattern of ${effectiveTargetColumn} by Year`,
           xaxis: { title: 'Month' },
-          yaxis: { title: `Average ${targetColumn}` },
+          yaxis: { title: `Average ${effectiveTargetColumn}` },
           autosize: true,
           height: 500,
           margin: { l: 50, r: 50, b: 100, t: 100, pad: 4 },
@@ -335,7 +344,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     const dataByYearAndDow: Record<number, Record<number, number[]>> = {};
     
     timeFeatureData.forEach(item => {
-      const date = new Date(item[dateColumn]);
+      const date = new Date(item[effectiveDateColumn]);
       const year = date.getFullYear();
       const dow = item.day_of_week;
       
@@ -347,7 +356,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         dataByYearAndDow[year][dow] = [];
       }
       
-      dataByYearAndDow[year][dow].push(Number(item[targetColumn]));
+      dataByYearAndDow[year][dow].push(Number(item[effectiveTargetColumn]));
     });
     
     // Calculate average for each year and day of week
@@ -387,9 +396,9 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       <Plot
         data={traces as Data[]}
         layout={{
-          title: `Day of Week Pattern of ${targetColumn} by Year`,
+          title: `Day of Week Pattern of ${effectiveTargetColumn} by Year`,
           xaxis: { title: 'Day of Week' },
-          yaxis: { title: `Average ${targetColumn}` },
+          yaxis: { title: `Average ${effectiveTargetColumn}` },
           autosize: true,
           height: 500,
           margin: { l: 50, r: 50, b: 100, t: 100, pad: 4 },
@@ -415,14 +424,14 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     const dataByYear: Record<number, number[]> = {};
     
     processedData.forEach(item => {
-      const date = new Date(item[dateColumn]);
+      const date = new Date(item[effectiveDateColumn]);
       const year = date.getFullYear();
       
       if (!dataByYear[year]) {
         dataByYear[year] = [];
       }
       
-      dataByYear[year].push(Number(item[targetColumn]));
+      dataByYear[year].push(Number(item[effectiveTargetColumn]));
     });
     
     // Create traces for each year
@@ -442,8 +451,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       <Plot
         data={traces as Data[]}
         layout={{
-          title: `Distribution of ${targetColumn} by Year`,
-          xaxis: { title: targetColumn },
+          title: `Distribution of ${effectiveTargetColumn} by Year`,
+          xaxis: { title: effectiveTargetColumn },
           yaxis: { title: 'Frequency' },
           autosize: true,
           height: 500,
@@ -470,14 +479,14 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     const dataByYear: Record<number, number[]> = {};
     
     processedData.forEach(item => {
-      const date = new Date(item[dateColumn]);
+      const date = new Date(item[effectiveDateColumn]);
       const year = date.getFullYear();
       
       if (!dataByYear[year]) {
         dataByYear[year] = [];
       }
       
-      dataByYear[year].push(Number(item[targetColumn]));
+      dataByYear[year].push(Number(item[effectiveTargetColumn]));
     });
     
     // Create traces for each year
@@ -496,8 +505,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       <Plot
         data={traces as Data[]}
         layout={{
-          title: `Box Plot of ${targetColumn} by Year`,
-          yaxis: { title: targetColumn },
+          title: `Box Plot of ${effectiveTargetColumn} by Year`,
+          yaxis: { title: effectiveTargetColumn },
           autosize: true,
           height: 500,
           margin: { l: 50, r: 50, b: 100, t: 100, pad: 4 },
@@ -522,7 +531,22 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     <Box sx={{ mb: 4 }}>
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
+          <Typography variant="subtitle1" gutterBottom>
+            Error Processing Data
+          </Typography>
+          <Typography variant="body2">
+            {error}
+          </Typography>
+          {error.includes('column') && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                <strong>Available columns:</strong> {data && data.length > 0 ? Object.keys(data[0]).join(', ') : 'No data available'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Selected columns:</strong> Date: "{effectiveDateColumn}", Target: "{effectiveTargetColumn}"
+              </Typography>
+            </Box>
+          )}
         </Alert>
       )}
       
@@ -633,8 +657,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       {/* ML Analysis Section */}
       <MLAnalysis 
         data={processedData}
-        dateColumn={dateColumn}
-        targetColumn={targetColumn}
+        dateColumn={effectiveDateColumn}
+        targetColumn={effectiveTargetColumn}
       />
     </Box>
   );

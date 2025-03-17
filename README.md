@@ -22,6 +22,7 @@ An interactive web application for time series data visualization and analysis, 
 - npm or yarn
 - Supabase account (free tier is sufficient)
 - Upstash Redis account (free tier is sufficient)
+- Python 3.8+ (for ML API server)
 
 ### Installation
 
@@ -78,6 +79,74 @@ An interactive web application for time series data visualization and analysis, 
    ```
 
 7. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
+## Running the ML API Server Locally
+
+The application includes a machine learning component that requires a separate Python API server. To run this server locally:
+
+### Prerequisites for ML Server
+
+1. Python 3.8 or higher
+2. Required Python packages:
+   ```bash
+   pip install fastapi uvicorn pandas numpy xgboost scikit-learn matplotlib shap
+   ```
+
+### Starting the ML Server
+
+#### Windows
+Run the included batch file:
+```bash
+run_ml_server.bat
+```
+
+#### macOS/Linux
+Run the included shell script:
+```bash
+chmod +x run_ml_server.sh
+./run_ml_server.sh
+```
+
+#### Manual Start
+You can also start the server manually:
+```bash
+cd src/app/api/ml
+python run_local_server.py
+```
+
+The ML API server will be available at http://localhost:8000. The main application will automatically connect to this server when it's running.
+
+### Testing the ML Server
+
+To verify the ML server is running correctly, visit:
+```
+http://localhost:8000/health
+```
+
+You should see a response: `{"status":"healthy"}`
+
+### Testing with Custom Column Names
+
+The ML API now supports any column names for date and target values. To test this functionality:
+
+#### Windows
+```bash
+test_ml_api.bat
+```
+
+#### macOS/Linux
+```bash
+chmod +x test_ml_api.sh
+./test_ml_api.sh
+```
+
+#### Manual Test
+```bash
+cd src/app/api/ml
+python test_api.py
+```
+
+This test script generates sample data with custom column names (`Date_custom` and `Sales_custom`) and sends it to the API for analysis. If successful, it will display the model metrics and feature importance.
 
 ## Usage
 

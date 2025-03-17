@@ -40,6 +40,10 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   // Try to use DataContext, but fall back to props if not available
   const dataContext = useData();
   
+  // Use the props values, but if they're empty and we're using sample data, fall back to context values
+  const effectiveDateColumn = dateColumn || (dataContext?.isSampleData ? dataContext?.dateColumn : '');
+  const effectiveTargetColumn = targetColumn || (dataContext?.isSampleData ? dataContext?.targetColumn : '');
+  
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<MLAnalysisResults | null>(null);
@@ -51,10 +55,12 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   
   // Memoize the data preparation for ML analysis
   const preparedData = useMemo(() => {
-    // Determine which data to use - context data if available, otherwise prop data
-    const sourceData = dataContext?.allData?.length ? dataContext.allData : data;
+    // Always use the props data, not the context data
+    const sourceData = data;
     
-    console.log(`Using ${sourceData.length} data points for ML analysis`);
+    if (sourceData.length > 0) {
+      console.log('Available columns:', Object.keys(sourceData[0]));
+    }
     
     // Create a deep copy of the data to avoid modifying the original
     const dataCopy = sourceData.map(item => {
@@ -73,7 +79,7 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     });
     
     return normalizedData;
-  }, [dataContext, data]);
+  }, [data, dateColumn, targetColumn]);
   
   // Define handleAnalyze with useCallback to avoid dependency issues
   const handleAnalyze = useCallback(async () => {
@@ -84,40 +90,23 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     setAnalysisInitiated(true);
     
     try {
-      console.log(`Analyzing ${preparedData.length} data points with machine learning`);
-      console.log(`Using date column: "${dateColumn}" and target column: "${targetColumn}"`);
-      
       // Check if data has the specified columns
       if (preparedData.length > 0) {
         const sampleRow = preparedData[0];
         const availableColumns = Object.keys(sampleRow);
-        console.log('Available columns:', availableColumns);
         
-        // Try to find the date column (case-insensitive)
-        const dateColumnLower = dateColumn.toLowerCase();
-        const matchingDateColumns = availableColumns.filter(col => 
-          col.toLowerCase() === dateColumnLower
-        );
-        
-        // Try to find the target column (case-insensitive)
-        const targetColumnLower = targetColumn.toLowerCase();
-        const matchingTargetColumns = availableColumns.filter(col => 
-          col.toLowerCase() === targetColumnLower
-        );
-        
-        if (matchingDateColumns.length === 0) {
-          throw new Error(`Date column "${dateColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`);
+        // Directly use the column names provided by props
+        if (!availableColumns.includes(effectiveDateColumn)) {
+          const errorMsg = `Date column "${effectiveDateColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
         }
         
-        if (matchingTargetColumns.length === 0) {
-          throw new Error(`Target column "${targetColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`);
+        if (!availableColumns.includes(effectiveTargetColumn)) {
+          const errorMsg = `Target column "${effectiveTargetColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`;
+          console.error(errorMsg);
+          throw new Error(errorMsg);
         }
-        
-        // Use the actual column name from the data (preserving case)
-        const actualDateColumn = matchingDateColumns[0];
-        const actualTargetColumn = matchingTargetColumns[0];
-        
-        console.log(`Using actual column names: date="${actualDateColumn}", target="${actualTargetColumn}"`);
         
         // Create a copy of the data specifically for the ML API
         // This ensures we don't modify the original data used by other components
@@ -125,15 +114,15 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           const newItem = { ...item };
           
           // Ensure date is in string format for the ML API
-          if (newItem[actualDateColumn] instanceof Date) {
-            newItem[actualDateColumn] = newItem[actualDateColumn].toISOString();
+          if (newItem[effectiveDateColumn] instanceof Date) {
+            newItem[effectiveDateColumn] = newItem[effectiveDateColumn].toISOString();
           }
           
           return newItem;
         });
         
         // Request multiple waterfall plots for different examples
-        const analysisResults = await analyzeData(mlData, actualDateColumn, actualTargetColumn, true);
+        const analysisResults = await analyzeData(mlData, effectiveDateColumn, effectiveTargetColumn, true);
         setResults(analysisResults);
       } else {
         throw new Error('No data available for analysis');
@@ -145,7 +134,7 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [preparedData, dateColumn, targetColumn, loading]);
+  }, [preparedData, effectiveDateColumn, effectiveTargetColumn, loading]);
   
   // Check if the API is available when the component mounts
   useEffect(() => {
@@ -168,15 +157,16 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   // Automatically run analysis when API is available
   useEffect(() => {
     if (apiAvailable === true && !results && !loading && !analysisInitiated && preparedData.length > 0) {
+      console.log('Auto-running analysis with columns:', { effectiveDateColumn, effectiveTargetColumn });
       handleAnalyze();
     }
-  }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze, preparedData.length]);
+  }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze, preparedData.length, effectiveDateColumn, effectiveTargetColumn]);
   
   // Add a comment to clarify data source
   useEffect(() => {
-    const dataSource = dataContext?.allData?.length ? 'DataContext' : 'props';
-    console.log(`ML Analysis is using data from ${dataSource} (${preparedData.length} records)`);
-  }, [dataContext, preparedData.length]);
+    console.log(`ML Analysis is using data from props (${preparedData.length} records)`);
+    console.log('Using columns:', { effectiveDateColumn, effectiveTargetColumn });
+  }, [preparedData.length, effectiveDateColumn, effectiveTargetColumn]);
   
   const renderMetrics = () => {
     if (!results) return null;
@@ -469,6 +459,47 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   };
   
   // If we don't have enough data, show a message
+  if (!data || data.length === 0) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Machine Learning Analysis
+        </Typography>
+        
+        <Paper sx={{ p: 2, mb: 3, bgcolor: '#1a1f2c', color: 'white' }}>
+          <Typography variant="h6" gutterBottom>
+            No Data Available
+          </Typography>
+          <Typography variant="body2" paragraph>
+            No data is available for machine learning analysis. Please ensure data is loaded correctly.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+  
+  if (!effectiveDateColumn || !effectiveTargetColumn) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Machine Learning Analysis
+        </Typography>
+        
+        <Paper sx={{ p: 2, mb: 3, bgcolor: '#1a1f2c', color: 'white' }}>
+          <Typography variant="h6" gutterBottom>
+            Missing Required Columns
+          </Typography>
+          <Typography variant="body2" paragraph>
+            Date column and target column must be specified for machine learning analysis.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            Date column: "{effectiveDateColumn}", Target column: "{effectiveTargetColumn}"
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
+  
   if (preparedData.length < 10) {
     return (
       <Box sx={{ mb: 4 }}>
@@ -482,6 +513,9 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           </Typography>
           <Typography variant="body2" paragraph>
             Machine learning analysis requires at least 10 data points. Please upload a larger dataset.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            Current data points: {preparedData.length}
           </Typography>
         </Paper>
       </Box>
@@ -499,7 +533,7 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           XGBoost Regression with SHAP Analysis
         </Typography>
         <Typography variant="body2" paragraph>
-          This analysis uses XGBoost, a powerful gradient boosting algorithm, to predict {targetColumn} based on time features extracted from {dateColumn}. The model is trained on 80% of the data and tested on the remaining 20%.
+          This analysis uses XGBoost, a powerful gradient boosting algorithm, to predict <strong>"{effectiveTargetColumn}"</strong> based on time features extracted from <strong>"{effectiveDateColumn}"</strong>. The model is trained on 80% of the data and tested on the remaining 20%.
         </Typography>
         <Typography variant="body2" paragraph>
           SHAP (SHapley Additive exPlanations) values are used to explain the model's predictions and understand feature importance.
@@ -522,35 +556,17 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             <Typography variant="body2" paragraph>
               {error}
             </Typography>
-            {error.includes("column") && (
-              <Typography variant="body2" paragraph>
-                This error typically occurs when the column names in your data don't match what the ML API expects. 
-                Make sure your CSV file has properly named date and value columns.
-              </Typography>
-            )}
-            {error.includes("Date column") && (
+            {error.includes('column') && (
               <Box sx={{ mt: 1, mb: 2 }}>
                 <Typography variant="body2" gutterBottom>
-                  <strong>Suggestion:</strong> Your date column should be named "date" (case-sensitive). 
-                  You can rename it in your CSV file before uploading.
+                  <strong>Available columns:</strong> {preparedData.length > 0 ? Object.keys(preparedData[0]).join(', ') : 'No data available'}
                 </Typography>
                 <Typography variant="body2">
-                  Common date column names that should work: "date", "Date", "timestamp", "time"
+                  <strong>Selected columns:</strong> Date: "{effectiveDateColumn}", Target: "{effectiveTargetColumn}"
                 </Typography>
               </Box>
             )}
-            {error.includes("Target column") && (
-              <Box sx={{ mt: 1, mb: 2 }}>
-                <Typography variant="body2" gutterBottom>
-                  <strong>Suggestion:</strong> Your target column (the numeric value you want to analyze) 
-                  should be named "sales" or another recognizable name.
-                </Typography>
-                <Typography variant="body2">
-                  Common target column names that should work: "sales", "Sales", "value", "amount", "target"
-                </Typography>
-              </Box>
-            )}
-            <Box sx={{ mt: 1 }}>
+            <Box sx={{ mt: 1, display: 'flex', gap: 2 }}>
               <Button 
                 size="small" 
                 variant="outlined" 
@@ -559,6 +575,14 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
                 startIcon={loading && <CircularProgress size={16} color="inherit" />}
               >
                 Try Again
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="secondary"
+                onClick={() => window.history.back()}
+              >
+                Go Back to Column Selection
               </Button>
             </Box>
           </Alert>

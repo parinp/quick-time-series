@@ -6,8 +6,10 @@ import { TimeSeriesData } from '../utils/types';
 import FileUpload from '../components/FileUpload';
 import ColumnSelector from '../components/ColumnSelector';
 import DataVisualization from '../components/DataVisualization';
+import { useData } from '../utils/DataContext';
 
 export default function UploadPage() {
+  const { setDateColumn: setContextDateColumn, setTargetColumn: setContextTargetColumn } = useData();
   const [data, setData] = useState<TimeSeriesData[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const [dateColumn, setDateColumn] = useState<string>('');
@@ -26,11 +28,33 @@ export default function UploadPage() {
     if (uploadedDatasetId) {
       setDatasetId(uploadedDatasetId);
     }
+    
+    // Reset any context column names from sample data
+    setContextDateColumn('');
+    setContextTargetColumn('');
   };
 
   const handleColumnsSelected = (dateCol: string, targetCol: string) => {
+    // Verify the columns exist in the data
+    if (data.length > 0) {
+      const columns = Object.keys(data[0]);
+      
+      if (!columns.includes(dateCol)) {
+        console.error(`Selected date column "${dateCol}" not found in data columns:`, columns);
+      }
+      
+      if (!columns.includes(targetCol)) {
+        console.error(`Selected target column "${targetCol}" not found in data columns:`, columns);
+      }
+    }
+    
     setDateColumn(dateCol);
     setTargetColumn(targetCol);
+    
+    // Also update the context
+    setContextDateColumn(dateCol);
+    setContextTargetColumn(targetCol);
+    
     setIsAnalyzing(true);
   };
 

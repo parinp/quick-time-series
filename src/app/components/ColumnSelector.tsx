@@ -43,17 +43,36 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
   // Detect potential numeric columns (for target)
   const potentialNumericColumns = columns.filter(column => {
     if (data.length === 0) return false;
-    const value = data[0][column];
-    return typeof value === 'number';
+    
+    // Check multiple rows to ensure consistency
+    const sampleSize = Math.min(5, data.length);
+    let numericCount = 0;
+    
+    for (let i = 0; i < sampleSize; i++) {
+      const value = data[i][column];
+      if (typeof value === 'number' || (typeof value === 'string' && !isNaN(Number(value)))) {
+        numericCount++;
+      }
+    }
+    
+    // Consider it numeric if at least half the samples are numeric
+    return numericCount >= Math.ceil(sampleSize / 2);
   });
+
+  // Common target column names
+  const commonTargetNames = ['sales', 'revenue', 'value', 'target', 'amount', 'price', 'cost', 'profit'];
+  const suggestedTargetColumns = potentialNumericColumns.filter(col => 
+    commonTargetNames.some(term => col.toLowerCase().includes(term))
+  );
 
   useEffect(() => {
     console.log('ColumnSelector detected columns:', {
       allColumns: columns,
       dateColumns: potentialDateColumns,
-      numericColumns: potentialNumericColumns
+      numericColumns: potentialNumericColumns,
+      suggestedTargetColumns: suggestedTargetColumns
     });
-  }, [columns, potentialDateColumns, potentialNumericColumns]);
+  }, [columns, potentialDateColumns, potentialNumericColumns, suggestedTargetColumns]);
 
   const handleDateColumnChange = (event: SelectChangeEvent) => {
     setDateColumn(event.target.value);
@@ -66,6 +85,17 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
   const handleSubmit = () => {
     if (dateColumn && targetColumn) {
       console.log('ColumnSelector submitting columns:', { dateColumn, targetColumn });
+      console.log('Available columns:', columns);
+      
+      // Verify the selected columns exist in the data
+      if (!columns.includes(dateColumn)) {
+        console.error(`Selected date column "${dateColumn}" not found in data columns:`, columns);
+      }
+      
+      if (!columns.includes(targetColumn)) {
+        console.error(`Selected target column "${targetColumn}" not found in data columns:`, columns);
+      }
+      
       onColumnsSelected(dateColumn, targetColumn);
     }
   };
@@ -78,6 +108,12 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
       
       <Typography variant="body1" color="textSecondary" sx={{ mb: 3 }}>
         Please select the date column and the target column (numeric value) for your time series analysis.
+      </Typography>
+      
+      <Typography variant="body2" color="info.main" sx={{ mb: 3 }}>
+        <strong>Tip:</strong> The system will try to identify date columns and numeric columns that could be used as targets.
+        Date columns are marked with "(Date)" and recommended target columns with "(Recommended Target)".
+        If your columns aren't correctly identified, you can still select any column.
       </Typography>
       
       <Grid container spacing={3}>
@@ -118,9 +154,20 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
                 <MenuItem 
                   key={column} 
                   value={column}
-                  sx={potentialNumericColumns.includes(column) ? { fontWeight: 'bold' } : {}}
+                  sx={
+                    suggestedTargetColumns.includes(column) 
+                      ? { fontWeight: 'bold', color: 'success.main' } 
+                      : potentialNumericColumns.includes(column) 
+                        ? { fontWeight: 'bold' } 
+                        : {}
+                  }
                 >
-                  {column} {potentialNumericColumns.includes(column) ? '(Numeric)' : ''}
+                  {column} 
+                  {suggestedTargetColumns.includes(column) 
+                    ? ' (Recommended Target)' 
+                    : potentialNumericColumns.includes(column) 
+                      ? ' (Numeric)' 
+                      : ''}
                 </MenuItem>
               ))}
             </Select>

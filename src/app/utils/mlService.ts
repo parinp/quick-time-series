@@ -1,7 +1,8 @@
 import { TimeSeriesData } from './types';
 
 // API base URL - use environment variable or fallback to local development
-const API_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8000';
+// const API_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8000';
 
 /**
  * Interface for ML analysis results
@@ -45,6 +46,14 @@ export async function analyzeData(
   multipleWaterfallPlots: boolean = false
 ): Promise<MLAnalysisResults> {
   try {
+    console.log(`Sending analysis request to ${API_BASE_URL}/analyze`);
+    console.log(`Using date column: "${dateColumn}", target column: "${targetColumn}"`);
+    
+    if (data.length > 0) {
+      console.log('Available columns:', Object.keys(data[0]));
+      console.log('Sample data row:', data[0]);
+    }
+    
     const response = await fetch(`${API_BASE_URL}/analyze`, {
       method: 'POST',
       headers: {
@@ -65,6 +74,8 @@ export async function analyzeData(
       const errorData = await response.json();
       let errorMessage = 'Failed to analyze data';
       
+      console.error('API error response:', errorData);
+      
       // Extract detailed error message if available
       if (errorData.detail) {
         if (typeof errorData.detail === 'string') {
@@ -79,6 +90,7 @@ export async function analyzeData(
       throw new Error(errorMessage);
     }
 
+    console.log('Analysis completed successfully');
     return await response.json();
   } catch (error) {
     console.error('Error analyzing data:', error);

@@ -38,6 +38,8 @@ interface DataContextType {
   selectedYears: number[];
   setSelectedYears: React.Dispatch<React.SetStateAction<number[]>>;
   availableYears: number[];
+  // Flag to track if we're using sample data
+  isSampleData: boolean;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -57,8 +59,11 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [error, setError] = useState<string | null>(null);
   
   // Column selection
-  const [dateColumn, setDateColumn] = useState<string>('date');
-  const [targetColumn, setTargetColumn] = useState<string>('sales');
+  const [dateColumn, setDateColumn] = useState<string>('');
+  const [targetColumn, setTargetColumn] = useState<string>('');
+  
+  // Flag to track if we're using sample data
+  const [isSampleData, setIsSampleData] = useState<boolean>(true);
   
   // Time Series filters
   const [tsFilterStartDate, setTsFilterStartDate] = useState<Date | null>(null);
@@ -97,6 +102,21 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         setAllData(formattedData);
         setStoreData(formattedData); // Initially set store data to all data
+        
+        // For sample data, set default column names
+        if (formattedData.length > 0) {
+          const sampleColumns = Object.keys(formattedData[0]);
+          
+          if (sampleColumns.includes('date')) {
+            setDateColumn('date');
+          }
+          if (sampleColumns.includes('sales')) {
+            setTargetColumn('sales');
+          }
+          
+          // Mark as sample data
+          setIsSampleData(true);
+        }
         
         // Calculate date range from the entire dataset
         const dates = formattedData
@@ -157,7 +177,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       try {
         setStoreLoading(true);
-        console.log(`Fetching data for store ${storeId}...`);
         
         // Fetch data for the specific store
         const storeSpecificData = await fetchStoreData(storeId);
@@ -176,12 +195,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           store_id: Number(item.store_id)
         }));
         
-        console.log(`Loaded ${formattedStoreData.length} records for store ${storeId}`);
         setStoreData(formattedStoreData);
       } catch (err) {
         console.error(`Error fetching data for store ${storeId}:`, err);
         // Fall back to filtering from all data
-        console.log('Falling back to filtering from all data');
         const filteredData = allData.filter(item => item.store_id === storeId);
         setStoreData(filteredData);
       } finally {
@@ -254,7 +271,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setAaFilterEndDate,
     selectedYears,
     setSelectedYears,
-    availableYears
+    availableYears,
+    isSampleData
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
