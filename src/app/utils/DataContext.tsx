@@ -263,7 +263,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 export const useData = () => {
   const context = useContext(DataContext);
   
-  // Return undefined instead of throwing an error if used outside of DataProvider
-  // This allows components to gracefully handle the absence of context
+  if (context === undefined) {
+    throw new Error('useData must be used within a DataProvider');
+  }
+  
   return context;
 }; 
