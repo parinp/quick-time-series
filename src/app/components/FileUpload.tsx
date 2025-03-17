@@ -49,8 +49,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
     setUploadProgress(0);
 
     try {
-      console.log(`Uploading file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
-      
       // Create form data
       const formData = new FormData();
       formData.append('file', file);
@@ -66,45 +64,27 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Upload error:', errorData);
         throw new Error(errorData.error || 'Failed to upload file');
       }
 
       const result = await response.json();
-      console.log('Upload result:', result);
       
       if (result.success) {
-        console.log(`Fetching data for dataset ID: ${result.datasetId}`);
         // Fetch the processed data
         const dataResponse = await fetch(`/api/data/${result.datasetId}`);
         
         if (!dataResponse.ok) {
           const errorData = await dataResponse.json();
-          console.error('Data retrieval error:', errorData);
           throw new Error('Failed to retrieve processed data');
         }
         
         const dataResult = await dataResponse.json();
-        console.log('Data retrieval result:', dataResult);
         
         if (dataResult.success) {
-          console.log('Data retrieval successful, checking data:');
-          console.log('- Has data property:', !!dataResult.data);
-          
-          if (dataResult.data) {
-            console.log('- Data is array:', Array.isArray(dataResult.data));
-            console.log('- Data length:', dataResult.data.length);
-            
-            if (dataResult.data.length > 0) {
-              console.log('- Sample data row:', dataResult.data[0]);
-            }
-          }
-          
           // Make sure we're passing an array to onDataLoaded
           if (dataResult.data && Array.isArray(dataResult.data) && dataResult.data.length > 0) {
             onDataLoaded(dataResult.data, result.datasetId);
           } else {
-            console.error('Invalid data format received:', dataResult.data);
             throw new Error('Invalid data format received from server');
           }
           
@@ -116,7 +96,6 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
         throw new Error(result.error || 'Failed to upload file');
       }
     } catch (err) {
-      console.error('File upload error:', err);
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsLoading(false);
     }

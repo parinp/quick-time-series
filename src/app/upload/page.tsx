@@ -15,29 +15,10 @@ export default function UploadPage() {
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [datasetId, setDatasetId] = useState<string | undefined>(undefined);
 
-  // Add debugging effect
-  useEffect(() => {
-    console.log('UploadPage state updated:');
-    console.log('- data:', data);
-    console.log('- isDataLoaded:', isDataLoaded);
-    console.log('- dateColumn:', dateColumn);
-    console.log('- targetColumn:', targetColumn);
-    console.log('- isAnalyzing:', isAnalyzing);
-    console.log('- datasetId:', datasetId);
-  }, [data, isDataLoaded, dateColumn, targetColumn, isAnalyzing, datasetId]);
-
   const handleDataLoaded = (uploadedData: TimeSeriesData[], uploadedDatasetId?: string) => {
-    console.log('handleDataLoaded called with:', { 
-      dataLength: uploadedData?.length, 
-      datasetId: uploadedDatasetId 
-    });
-    
     if (!uploadedData || uploadedData.length === 0) {
-      console.error('No data received in handleDataLoaded');
       return;
     }
-    
-    console.log('Sample data row:', uploadedData[0]);
     
     setData(uploadedData);
     setIsDataLoaded(true);
@@ -48,7 +29,6 @@ export default function UploadPage() {
   };
 
   const handleColumnsSelected = (dateCol: string, targetCol: string) => {
-    console.log('handleColumnsSelected called with:', { dateCol, targetCol });
     setDateColumn(dateCol);
     setTargetColumn(targetCol);
     setIsAnalyzing(true);
