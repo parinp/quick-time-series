@@ -75,25 +75,6 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     return normalizedData;
   }, [dataContext, data]);
   
-  // Function to normalize column names for the ML API
-  const normalizeColumnName = useCallback((columnName: string): string => {
-    // Convert to lowercase for case-insensitive comparison
-    const lowerName = columnName.toLowerCase();
-    
-    // Common date column names
-    if (['date', 'datetime', 'time', 'timestamp'].includes(lowerName)) {
-      return 'date';
-    }
-    
-    // Common target column names
-    if (['sales', 'value', 'target', 'amount'].includes(lowerName)) {
-      return 'sales';
-    }
-    
-    // Return the original name if no match
-    return columnName;
-  }, []);
-  
   // Define handleAnalyze with useCallback to avoid dependency issues
   const handleAnalyze = useCallback(async () => {
     if (loading) return; // Prevent multiple simultaneous calls

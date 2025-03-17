@@ -243,11 +243,15 @@ def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: st
         if not data:
             raise ValueError("No data provided for analysis")
         
-        if date_column not in data[0]:
-            raise ValueError(f"Date column '{date_column}' not found in data")
+        # Check if the specified columns exist in the data
+        sample_row = data[0]
+        available_columns = list(sample_row.keys())
+        
+        if date_column not in available_columns:
+            raise ValueError(f"Date column '{date_column}' not found in data. Available columns: {', '.join(available_columns)}")
             
-        if target_column not in data[0]:
-            raise ValueError(f"Target column '{target_column}' not found in data")
+        if target_column not in available_columns:
+            raise ValueError(f"Target column '{target_column}' not found in data. Available columns: {', '.join(available_columns)}")
         
         # Train the model
         model_data = train_xgboost_model(data, date_column, target_column)
