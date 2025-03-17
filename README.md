@@ -1,12 +1,14 @@
 # Time Series Analysis Dashboard
 
-An interactive web application for time series data visualization and analysis, built with Next.js, Material UI, Plotly.js, and Supabase.
+An interactive web application for time series data visualization and analysis, built with Next.js, Material UI, Plotly.js, Supabase, and Upstash Redis.
 
 ## Features
 
 - **Interactive Data Visualization**: Visualize time series data with various chart types including line charts, bar charts, histograms, and box plots.
 - **Sample Data Analysis**: Explore the Rossmann Store Sales dataset with data from Supabase.
-- **Custom Data Upload**: Upload your own CSV files for analysis.
+- **Custom Data Upload**: Upload your own CSV files for analysis (up to 40MB).
+- **CSV to Parquet Conversion**: Automatically converts CSV data to Parquet format for efficient storage.
+- **Redis Caching**: Uses Upstash Redis for in-memory caching of uploaded data.
 - **Time Pattern Detection**: Analyze patterns by month, day of week, and other time dimensions.
 - **Statistical Summaries**: View summary statistics and distribution analysis.
 - **Missing Value Analysis**: Identify and analyze missing values in your data.
@@ -19,6 +21,7 @@ An interactive web application for time series data visualization and analysis, 
 - Node.js 18.x or later
 - npm or yarn
 - Supabase account (free tier is sufficient)
+- Upstash Redis account (free tier is sufficient)
 
 ### Installation
 
@@ -41,22 +44,40 @@ An interactive web application for time series data visualization and analysis, 
    - Run the SQL script from `cloud-run-service/supabase_add_day_of_week.sql` to add the day_of_week column
    - Upload the Rossmann data using the script in `cloud-run-service/upload_rossmann_supabase_api.py`
 
-4. Set up environment variables:
+4. Set up Upstash Redis:
+   - Create a free account at [Upstash](https://upstash.com/)
+   - Create a new Redis database
+   - Copy your REST URL and REST Token from the database details page
+
+5. Set up environment variables:
    ```bash
-   npm run setup-env
-   # or manually create a .env.local file with your Supabase credentials:
-   # NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   # NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   # Copy the example .env file
+   cp .env.local.example .env.local
+   # Edit .env.local with your Supabase and Upstash Redis credentials
    ```
 
-5. Run the development server:
+   Your `.env.local` file should include:
+   ```
+   # Supabase credentials
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   
+   # Upstash Redis credentials
+   UPSTASH_REDIS_REST_URL=your_upstash_redis_url
+   UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
+   
+   # Optional: Set the expiration time for cached data in seconds (default: 3600 = 1 hour)
+   REDIS_CACHE_EXPIRATION=3600
+   ```
+
+6. Run the development server:
    ```bash
    npm run dev
    # or
    yarn dev
    ```
 
-6. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+7. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 
 ## Usage
 
@@ -70,9 +91,10 @@ An interactive web application for time series data visualization and analysis, 
 ### Custom Data Upload
 
 1. Navigate to the "Upload Data" page from the navigation bar.
-2. Click "Select CSV File" and choose a CSV file from your computer.
-3. Once uploaded, select the date column and target column from your data.
-4. Click "Analyze" to generate visualizations and statistics.
+2. Click "Select CSV File" and choose a CSV file from your computer (max 40MB).
+3. The file will be uploaded, converted to Parquet format, and cached in Redis.
+4. Once uploaded, select the date column and target column from your data.
+5. Click "Analyze" to generate visualizations and statistics.
 
 ## Data Format
 
@@ -116,6 +138,8 @@ This application can be deployed on Vercel:
 - [Plotly.js](https://plotly.com/javascript/) - Interactive visualization library
 - [Papa Parse](https://www.papaparse.com/) - CSV parsing library
 - [Supabase](https://supabase.com/) - Backend database and authentication
+- [Upstash Redis](https://upstash.com/) - Serverless Redis for data caching
+- [ParquetJS](https://github.com/ironSource/parquetjs) - Parquet file format library
 
 ## License
 

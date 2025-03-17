@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   Box, 
   Paper, 
@@ -25,6 +25,15 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
   const [dateColumn, setDateColumn] = React.useState<string>('');
   const [targetColumn, setTargetColumn] = React.useState<string>('');
   
+  // Add debugging effect
+  useEffect(() => {
+    console.log('ColumnSelector received data:', {
+      dataLength: data?.length,
+      hasData: !!data && data.length > 0,
+      sampleRow: data && data.length > 0 ? data[0] : null
+    });
+  }, [data]);
+  
   // Get all columns from the data
   const columns = data && data.length > 0 ? Object.keys(data[0]) : [];
   
@@ -38,6 +47,14 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
     return typeof value === 'number';
   });
 
+  useEffect(() => {
+    console.log('ColumnSelector detected columns:', {
+      allColumns: columns,
+      dateColumns: potentialDateColumns,
+      numericColumns: potentialNumericColumns
+    });
+  }, [columns, potentialDateColumns, potentialNumericColumns]);
+
   const handleDateColumnChange = (event: SelectChangeEvent) => {
     setDateColumn(event.target.value);
   };
@@ -48,6 +65,7 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected
 
   const handleSubmit = () => {
     if (dateColumn && targetColumn) {
+      console.log('ColumnSelector submitting columns:', { dateColumn, targetColumn });
       onColumnsSelected(dateColumn, targetColumn);
     }
   };

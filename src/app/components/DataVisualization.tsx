@@ -16,7 +16,8 @@ import {
   Divider,
   Stack,
   Chip,
-  IconButton
+  IconButton,
+  Alert
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -26,10 +27,9 @@ import dynamic from 'next/dynamic';
 import { TimeSeriesData } from '../utils/types';
 import { groupBy, addTimeFeatures } from '../utils/dataProcessing';
 import EnhancedTimeSeriesChart from './EnhancedTimeSeriesChart';
-import { format, getYear } from 'date-fns';
+import { format, getYear, parseISO } from 'date-fns';
 import { Data } from 'plotly.js';
 import MLAnalysis from './MLAnalysis';
-import { useData } from '../utils/DataContext';
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -45,65 +45,160 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   dateColumn, 
   targetColumn 
 }) => {
-  const {
-    allData,
-    timeSeriesData,
-    additionalAnalysisData,
-    tsFilterStartDate,
-    setTsFilterStartDate,
-    tsFilterEndDate,
-    setTsFilterEndDate,
-    aaFilterStartDate,
-    setAaFilterStartDate,
-    aaFilterEndDate,
-    setAaFilterEndDate,
-    selectedYears,
-    setSelectedYears,
-    availableYears
-  } = useData();
-  
+  console.log('DataVisualization component rendering with:', {
+    dataLength: data?.length,
+    dateColumn,
+    targetColumn,
+    sampleRow: data && data.length > 0 ? data[0] : null
+  });
+
+  // Initialize local state for this component
+  const [processedData, setProcessedData] = useState<TimeSeriesData[]>([]);
   const [timeFeatureData, setTimeFeatureData] = useState<TimeSeriesData[]>([]);
   const [monthlyData, setMonthlyData] = useState<any[]>([]);
   const [dowData, setDowData] = useState<any[]>([]);
   const [selectedChart, setSelectedChart] = useState<string>('monthlyPattern');
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [totalSales, setTotalSales] = useState<number>(0);
+  const [avgSales, setAvgSales] = useState<number>(0);
+  const [dataPoints, setDataPoints] = useState<number>(0);
 
-  // Process data for charts using additionalAnalysisData (for Additional Analysis)
-  const processedChartData = useMemo(() => {
-    if (!additionalAnalysisData || additionalAnalysisData.length === 0 || !dateColumn || !targetColumn) {
-      return {
-        timeFeatureData: [] as TimeSeriesData[],
-        monthlyData: [] as any[],
-        dowData: [] as any[]
-      };
-    }
-    
-    console.log('Processing data for Additional Analysis charts:', {
-      dataLength: additionalAnalysisData.length,
-      years: [...new Set(additionalAnalysisData.map(item => new Date(item[dateColumn]).getFullYear()))].sort(),
-    });
-    
-    // Add time features
-    const dataWithTimeFeatures = addTimeFeatures(additionalAnalysisData, dateColumn);
-    
-    // Group by month
-    const byMonth = groupBy(dataWithTimeFeatures, 'month', targetColumn, 'mean');
-    
-    // Group by day of week
-    const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', targetColumn, 'mean');
-    
-    return {
-      timeFeatureData: dataWithTimeFeatures,
-      monthlyData: byMonth,
-      dowData: byDow
-    };
-  }, [additionalAnalysisData, dateColumn, targetColumn]);
-  
-  // Set state from memoized values
+  // Process the data when it changes
   useEffect(() => {
-    setTimeFeatureData(processedChartData.timeFeatureData);
-    setMonthlyData(processedChartData.monthlyData);
-    setDowData(processedChartData.dowData);
-  }, [processedChartData]);
+    if (!data || data.length === 0 || !dateColumn || !targetColumn) {
+      console.log('Missing required data or columns');
+      setError('Missing required data or columns');
+      return;
+    }
+
+    try {
+      console.log('Processing data for visualization');
+      console.log('Data sample:', data.slice(0, 3));
+      console.log('Date column:', dateColumn, 'Target column:', targetColumn);
+      
+      // Ensure dates are properly formatted and values are numbers
+      const processed = data.map(item => {
+        // Make a copy of the item
+        const newItem = {...item};
+        
+        // Ensure date is properly formatted
+        if (typeof newItem[dateColumn] === 'string') {
+          try {
+            // Try to parse the date
+            const parsedDate = new Date(newItem[dateColumn]);
+            if (!isNaN(parsedDate.getTime())) {
+              // If valid date, convert to Date object
+              newItem[dateColumn] = parsedDate;
+            } else {
+              console.log('Invalid date found:', newItem[dateColumn]);
+              throw new Error(`Invalid date: ${newItem[dateColumn]}`);
+            }
+          } catch (e) {
+            console.error('Error parsing date:', e);
+            setError(`Error parsing date: ${newItem[dateColumn]}`);
+          }
+        } else if (newItem[dateColumn] instanceof Date) {
+          // Already a Date object, keep as is
+          console.log('Date is already a Date object');
+        } else {
+          console.log('Date is not a string or Date object:', newItem[dateColumn]);
+          setError(`Date column contains invalid value: ${newItem[dateColumn]}`);
+        }
+        
+        // Ensure target column is a number
+        if (typeof newItem[targetColumn] !== 'number') {
+          const numValue = Number(newItem[targetColumn]);
+          if (!isNaN(numValue)) {
+            newItem[targetColumn] = numValue;
+          } else {
+            console.log('Invalid numeric value:', newItem[targetColumn]);
+            newItem[targetColumn] = 0; // Default to 0 for invalid numbers
+          }
+        }
+        
+        return newItem;
+      });
+      
+      console.log('Processed data sample:', processed.slice(0, 3));
+      setProcessedData(processed);
+      setDataPoints(processed.length);
+      
+      // Calculate total and average sales
+      const numericValues = processed
+        .map(item => Number(item[targetColumn]))
+        .filter(val => !isNaN(val));
+      
+      console.log('Numeric values sample:', numericValues.slice(0, 5));
+      console.log('Numeric values count:', numericValues.length);
+      
+      if (numericValues.length > 0) {
+        const total = numericValues.reduce((sum, val) => sum + val, 0);
+        const avg = total / numericValues.length;
+        
+        console.log('Total sales:', total);
+        console.log('Average sales:', avg);
+        
+        setTotalSales(total);
+        setAvgSales(avg);
+      } else {
+        console.log('No valid numeric values found');
+        setTotalSales(0);
+        setAvgSales(0);
+      }
+      
+      // Extract dates for date range
+      const dates = processed
+        .map(item => {
+          const dateValue = item[dateColumn];
+          return dateValue instanceof Date ? dateValue : new Date(dateValue);
+        })
+        .filter(date => !isNaN(date.getTime()));
+      
+      console.log('Dates sample:', dates.slice(0, 5));
+      console.log('Dates count:', dates.length);
+      
+      if (dates.length > 0) {
+        const minDate = dates.reduce((a, b) => a < b ? a : b);
+        const maxDate = dates.reduce((a, b) => a > b ? a : b);
+        
+        console.log('Min date:', minDate);
+        console.log('Max date:', maxDate);
+        
+        setStartDate(minDate);
+        setEndDate(maxDate);
+        
+        // Extract years for year selection
+        const years = [...new Set(dates.map(date => date.getFullYear()))].sort();
+        console.log('Available years:', years);
+        
+        setAvailableYears(years);
+        setSelectedYears(years);
+      } else {
+        console.log('No valid dates found');
+      }
+      
+      // Add time features
+      const dataWithTimeFeatures = addTimeFeatures(processed, dateColumn);
+      setTimeFeatureData(dataWithTimeFeatures);
+      
+      // Group by month
+      const byMonth = groupBy(dataWithTimeFeatures, 'month', targetColumn, 'mean');
+      setMonthlyData(byMonth);
+      
+      // Group by day of week
+      const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', targetColumn, 'mean');
+      setDowData(byDow);
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error processing data:', err);
+      setError(`Error processing data: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [data, dateColumn, targetColumn]);
 
   const handleChartChange = (event: SelectChangeEvent) => {
     setSelectedChart(event.target.value);
@@ -121,26 +216,17 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     });
   };
 
-  const resetTimeSeriesFilters = () => {
-    if (allData && allData.length > 0) {
-      const dates = allData.map(item => new Date(item[dateColumn])).filter(date => !isNaN(date.getTime()));
+  const resetFilters = () => {
+    if (data && data.length > 0) {
+      const dates = data
+        .map(item => new Date(item[dateColumn]))
+        .filter(date => !isNaN(date.getTime()));
+      
       if (dates.length > 0) {
         const minDate = dates.reduce((a, b) => a < b ? a : b);
         const maxDate = dates.reduce((a, b) => a > b ? a : b);
-        setTsFilterStartDate(minDate);
-        setTsFilterEndDate(maxDate);
-      }
-    }
-  };
-
-  const resetAdditionalFilters = () => {
-    if (allData && allData.length > 0) {
-      const dates = allData.map(item => new Date(item[dateColumn])).filter(date => !isNaN(date.getTime()));
-      if (dates.length > 0) {
-        const minDate = dates.reduce((a, b) => a < b ? a : b);
-        const maxDate = dates.reduce((a, b) => a > b ? a : b);
-        setAaFilterStartDate(minDate);
-        setAaFilterEndDate(maxDate);
+        setStartDate(minDate);
+        setEndDate(maxDate);
         setSelectedYears(availableYears);
       }
     }
@@ -149,7 +235,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   const renderTimeSeriesChart = () => {
     return (
       <EnhancedTimeSeriesChart
-        data={timeSeriesData}
+        data={processedData}
         dateField={dateColumn}
         valueField={targetColumn}
         title={`${targetColumn} Over Time`}
@@ -193,10 +279,6 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         yearlyMonthlyAverages[yearNum][monthNum] = sum / values.length;
       });
     });
-    
-    console.log('Years in dataByYearAndMonth:', Object.keys(dataByYearAndMonth).sort());
-    console.log('Years in yearlyMonthlyAverages:', Object.keys(yearlyMonthlyAverages).sort());
-    console.log('Selected years for chart:', selectedYears);
     
     // Create traces for each year
     const traces = selectedYears.map(year => {
@@ -332,7 +414,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     // Group data by year
     const dataByYear: Record<number, number[]> = {};
     
-    additionalAnalysisData.forEach(item => {
+    processedData.forEach(item => {
       const date = new Date(item[dateColumn]);
       const year = date.getFullYear();
       
@@ -387,7 +469,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     // Group data by year
     const dataByYear: Record<number, number[]> = {};
     
-    additionalAnalysisData.forEach(item => {
+    processedData.forEach(item => {
       const date = new Date(item[dateColumn]);
       const year = date.getFullYear();
       
@@ -438,10 +520,11 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
 
   return (
     <Box sx={{ mb: 4 }}>
-      {/* Time Series Analysis Section */}
-      <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
-        Time Series Analysis
-      </Typography>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
       
       {/* Time Series Chart */}
       <Box sx={{ mb: 4 }}>
@@ -468,19 +551,19 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2 }}>
                 <DatePicker 
-                  label="Start Date"
-                  value={aaFilterStartDate}
-                  onChange={(newValue: Date | null) => setAaFilterStartDate(newValue)}
+                  label="Start Date" 
+                  value={startDate}
+                  onChange={(newValue: Date | null) => setStartDate(newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
                 <DatePicker 
-                  label="End Date"
-                  value={aaFilterEndDate}
-                  onChange={(newValue: Date | null) => setAaFilterEndDate(newValue)}
+                  label="End Date" 
+                  value={endDate}
+                  onChange={(newValue: Date | null) => setEndDate(newValue)}
                   slotProps={{ textField: { fullWidth: true } }}
                 />
                 <IconButton 
-                  onClick={resetAdditionalFilters} 
+                  onClick={resetFilters} 
                   sx={{ color: 'white', alignSelf: 'center' }}
                   title="Reset Filters"
                 >
@@ -549,7 +632,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       
       {/* ML Analysis Section */}
       <MLAnalysis 
-        data={allData}
+        data={processedData}
         dateColumn={dateColumn}
         targetColumn={targetColumn}
       />

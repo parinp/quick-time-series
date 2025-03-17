@@ -41,19 +41,37 @@ export const detectDateColumns = (data: any[]) => {
 // Function to add time-based features to the dataset
 export const addTimeFeatures = (data: any[], dateColumn: string) => {
   return data.map(row => {
-    const date = new Date(row[dateColumn]);
+    // Handle date properly - could be a Date object or a string
+    let dateObj: Date;
+    if (row[dateColumn] instanceof Date) {
+      dateObj = row[dateColumn];
+    } else {
+      try {
+        dateObj = new Date(row[dateColumn]);
+        if (isNaN(dateObj.getTime())) {
+          console.error(`Invalid date value: ${row[dateColumn]}`);
+          // Use current date as fallback to avoid breaking the analysis
+          dateObj = new Date();
+        }
+      } catch (e) {
+        console.error(`Error parsing date: ${row[dateColumn]}`, e);
+        // Use current date as fallback
+        dateObj = new Date();
+      }
+    }
+    
     return {
       ...row,
-      year: date.getFullYear(),
-      month: date.getMonth() + 1,
-      day_of_month: date.getDate(),
-      day_of_week: date.getDay(),
-      day_of_year: Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 0).getTime()) / 86400000),
-      week_of_year: Math.ceil((((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7),
-      quarter: Math.floor(date.getMonth() / 3) + 1,
-      is_weekend: date.getDay() === 0 || date.getDay() === 6 ? 1 : 0,
-      is_month_start: date.getDate() === 1 ? 1 : 0,
-      is_month_end: new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() === date.getDate() ? 1 : 0,
+      year: dateObj.getFullYear(),
+      month: dateObj.getMonth() + 1,
+      day_of_month: dateObj.getDate(),
+      day_of_week: dateObj.getDay(),
+      day_of_year: Math.floor((dateObj.getTime() - new Date(dateObj.getFullYear(), 0, 0).getTime()) / 86400000),
+      week_of_year: Math.ceil((((dateObj.getTime() - new Date(dateObj.getFullYear(), 0, 1).getTime()) / 86400000) + new Date(dateObj.getFullYear(), 0, 1).getDay() + 1) / 7),
+      quarter: Math.floor(dateObj.getMonth() / 3) + 1,
+      is_weekend: dateObj.getDay() === 0 || dateObj.getDay() === 6 ? 1 : 0,
+      is_month_start: dateObj.getDate() === 1 ? 1 : 0,
+      is_month_end: new Date(dateObj.getFullYear(), dateObj.getMonth() + 1, 0).getDate() === dateObj.getDate() ? 1 : 0,
     };
   });
 };
@@ -167,14 +185,17 @@ export const smoothTimeSeries = (
   
   // Sort data by date
   const sortedData = [...data].sort((a, b) => {
-    const dateA = new Date(a[dateField]).getTime();
-    const dateB = new Date(b[dateField]).getTime();
+    const dateA = a[dateField] instanceof Date ? a[dateField].getTime() : new Date(a[dateField]).getTime();
+    const dateB = b[dateField] instanceof Date ? b[dateField].getTime() : new Date(b[dateField]).getTime();
     return dateA - dateB;
   });
   
   // Extract dates and values
   const dates = sortedData.map(item => item[dateField]);
-  const values = sortedData.map(item => Number(item[valueField]));
+  const values = sortedData.map(item => {
+    const val = Number(item[valueField]);
+    return isNaN(val) ? 0 : val; // Convert NaN to 0 to avoid breaking calculations
+  });
   
   // Apply moving average
   const smoothedValues: number[] = [];

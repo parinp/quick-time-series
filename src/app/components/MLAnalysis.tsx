@@ -37,8 +37,8 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   dateColumn,
   targetColumn,
 }) => {
-  // Use allData for machine learning analysis (no filters) - this ensures we use the complete dataset
-  const { allData } = useData();
+  // Try to use DataContext, but fall back to props if not available
+  const dataContext = useData();
   
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,15 +51,48 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   
   // Memoize the data preparation for ML analysis
   const preparedData = useMemo(() => {
-    // Filter out the 'open' feature from the data before sending to the ML service
-    return allData.map(item => {
-      const newItem = { ...item };
-      if ('open' in newItem) {
-        delete newItem.open;
-      }
-      return newItem;
+    // Determine which data to use - context data if available, otherwise prop data
+    const sourceData = dataContext?.allData?.length ? dataContext.allData : data;
+    
+    console.log(`Using ${sourceData.length} data points for ML analysis`);
+    
+    // Create a deep copy of the data to avoid modifying the original
+    const dataCopy = sourceData.map(item => {
+      // Create a new object with all properties from the original item
+      return { ...item };
     });
-  }, [allData]);
+    
+    // Normalize the data to ensure consistent column names
+    const normalizedData = dataCopy.map(item => {
+      // Remove 'open' feature if present
+      if ('open' in item) {
+        delete item.open;
+      }
+      
+      return item;
+    });
+    
+    return normalizedData;
+  }, [dataContext, data]);
+  
+  // Function to normalize column names for the ML API
+  const normalizeColumnName = useCallback((columnName: string): string => {
+    // Convert to lowercase for case-insensitive comparison
+    const lowerName = columnName.toLowerCase();
+    
+    // Common date column names
+    if (['date', 'datetime', 'time', 'timestamp'].includes(lowerName)) {
+      return 'date';
+    }
+    
+    // Common target column names
+    if (['sales', 'value', 'target', 'amount'].includes(lowerName)) {
+      return 'sales';
+    }
+    
+    // Return the original name if no match
+    return columnName;
+  }, []);
   
   // Define handleAnalyze with useCallback to avoid dependency issues
   const handleAnalyze = useCallback(async () => {
@@ -71,11 +104,61 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     
     try {
       console.log(`Analyzing ${preparedData.length} data points with machine learning`);
+      console.log(`Using date column: "${dateColumn}" and target column: "${targetColumn}"`);
       
-      // Request multiple waterfall plots for different examples
-      const analysisResults = await analyzeData(preparedData, dateColumn, targetColumn, true);
-      setResults(analysisResults);
+      // Check if data has the specified columns
+      if (preparedData.length > 0) {
+        const sampleRow = preparedData[0];
+        const availableColumns = Object.keys(sampleRow);
+        console.log('Available columns:', availableColumns);
+        
+        // Try to find the date column (case-insensitive)
+        const dateColumnLower = dateColumn.toLowerCase();
+        const matchingDateColumns = availableColumns.filter(col => 
+          col.toLowerCase() === dateColumnLower
+        );
+        
+        // Try to find the target column (case-insensitive)
+        const targetColumnLower = targetColumn.toLowerCase();
+        const matchingTargetColumns = availableColumns.filter(col => 
+          col.toLowerCase() === targetColumnLower
+        );
+        
+        if (matchingDateColumns.length === 0) {
+          throw new Error(`Date column "${dateColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`);
+        }
+        
+        if (matchingTargetColumns.length === 0) {
+          throw new Error(`Target column "${targetColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`);
+        }
+        
+        // Use the actual column name from the data (preserving case)
+        const actualDateColumn = matchingDateColumns[0];
+        const actualTargetColumn = matchingTargetColumns[0];
+        
+        console.log(`Using actual column names: date="${actualDateColumn}", target="${actualTargetColumn}"`);
+        
+        // Create a copy of the data specifically for the ML API
+        // This ensures we don't modify the original data used by other components
+        const mlData = preparedData.map(item => {
+          const newItem = { ...item };
+          
+          // Ensure date is in string format for the ML API
+          if (newItem[actualDateColumn] instanceof Date) {
+            newItem[actualDateColumn] = newItem[actualDateColumn].toISOString();
+          }
+          
+          return newItem;
+        });
+        
+        // Request multiple waterfall plots for different examples
+        const analysisResults = await analyzeData(mlData, actualDateColumn, actualTargetColumn, true);
+        setResults(analysisResults);
+      } else {
+        throw new Error('No data available for analysis');
+      }
     } catch (err) {
+      console.error('ML Analysis error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during analysis');
       setAnalysisInitiated(false); // Reset if there's an error so we can try again
     } finally {
@@ -103,15 +186,16 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   
   // Automatically run analysis when API is available
   useEffect(() => {
-    if (apiAvailable === true && !results && !loading && !analysisInitiated) {
+    if (apiAvailable === true && !results && !loading && !analysisInitiated && preparedData.length > 0) {
       handleAnalyze();
     }
-  }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze]);
+  }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze, preparedData.length]);
   
-  // Add a comment to clarify that we're intentionally using allData instead of the filtered data
+  // Add a comment to clarify data source
   useEffect(() => {
-    console.log(`ML Analysis will use the complete dataset (${allData.length} records) instead of the filtered data (${data.length} records)`);
-  }, [allData.length, data.length]);
+    const dataSource = dataContext?.allData?.length ? 'DataContext' : 'props';
+    console.log(`ML Analysis is using data from ${dataSource} (${preparedData.length} records)`);
+  }, [dataContext, preparedData.length]);
   
   const renderMetrics = () => {
     if (!results) return null;
@@ -381,7 +465,10 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             ML API Server Not Available
           </Typography>
           <Typography variant="body2" paragraph>
-            The ML API server is not running. Please start the server to automatically run the analysis.
+            The ML API server is not running. Machine learning analysis is not available at this time.
+          </Typography>
+          <Typography variant="body2">
+            You can still use all other features of the application. The ML analysis requires a separate server component.
           </Typography>
         </Alert>
       );
@@ -399,6 +486,26 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     
     return null;
   };
+  
+  // If we don't have enough data, show a message
+  if (preparedData.length < 10) {
+    return (
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom>
+          Machine Learning Analysis
+        </Typography>
+        
+        <Paper sx={{ p: 2, mb: 3, bgcolor: '#1a1f2c', color: 'white' }}>
+          <Typography variant="h6" gutterBottom>
+            Not Enough Data
+          </Typography>
+          <Typography variant="body2" paragraph>
+            Machine learning analysis requires at least 10 data points. Please upload a larger dataset.
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
   
   return (
     <Box sx={{ mb: 4 }}>
@@ -428,7 +535,40 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
         
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
+            <Typography variant="subtitle2" gutterBottom>
+              ML Analysis Error
+            </Typography>
+            <Typography variant="body2" paragraph>
+              {error}
+            </Typography>
+            {error.includes("column") && (
+              <Typography variant="body2" paragraph>
+                This error typically occurs when the column names in your data don't match what the ML API expects. 
+                Make sure your CSV file has properly named date and value columns.
+              </Typography>
+            )}
+            {error.includes("Date column") && (
+              <Box sx={{ mt: 1, mb: 2 }}>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Suggestion:</strong> Your date column should be named "date" (case-sensitive). 
+                  You can rename it in your CSV file before uploading.
+                </Typography>
+                <Typography variant="body2">
+                  Common date column names that should work: "date", "Date", "timestamp", "time"
+                </Typography>
+              </Box>
+            )}
+            {error.includes("Target column") && (
+              <Box sx={{ mt: 1, mb: 2 }}>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Suggestion:</strong> Your target column (the numeric value you want to analyze) 
+                  should be named "sales" or another recognizable name.
+                </Typography>
+                <Typography variant="body2">
+                  Common target column names that should work: "sales", "Sales", "value", "amount", "target"
+                </Typography>
+              </Box>
+            )}
             <Box sx={{ mt: 1 }}>
               <Button 
                 size="small" 
@@ -450,6 +590,23 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           {renderFeatureImportance()}
           {renderShapPlots()}
         </>
+      )}
+      
+      {apiAvailable === false && (
+        <Paper sx={{ p: 2, bgcolor: '#1a1f2c', color: 'white' }}>
+          <Typography variant="h6" gutterBottom>
+            ML Analysis Not Available
+          </Typography>
+          <Typography variant="body2" paragraph>
+            The machine learning analysis requires a separate API server to be running. This server handles the computational tasks of training models and generating visualizations.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            You can still use all other features of the application, including data visualization and pattern analysis.
+          </Typography>
+          <Typography variant="body2" paragraph>
+            <strong>For Developers:</strong> If you're running this application locally, you need to start the ML API server separately. Check the project documentation for instructions.
+          </Typography>
+        </Paper>
       )}
     </Box>
   );

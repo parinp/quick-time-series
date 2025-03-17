@@ -7,62 +7,116 @@ import {
   Typography, 
   Paper, 
   CircularProgress,
-  Alert
+  Alert,
+  LinearProgress
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { parseCSV } from '../utils/dataProcessing';
 import { TimeSeriesData } from '../utils/types';
 
 interface FileUploadProps {
-  onDataLoaded: (data: TimeSeriesData[]) => void;
+  onDataLoaded: (data: TimeSeriesData[], datasetId?: string) => void;
 }
+
+// Maximum file size (40MB)
+const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB in bytes
 
 const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File size exceeds the 40MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      return;
+    }
+
+    // Check file type
+    if (!file.name.endsWith('.csv')) {
+      setError('Please upload a CSV file');
+      return;
+    }
+
     setFileName(file.name);
     setIsLoading(true);
     setError(null);
+    setUploadProgress(0);
 
     try {
-      // Check if file is CSV
-      if (!file.name.endsWith('.csv')) {
-        throw new Error('Please upload a CSV file');
+      console.log(`Uploading file: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload file to API
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      // Update progress manually since fetch doesn't support progress tracking
+      setUploadProgress(100);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Upload error:', errorData);
+        throw new Error(errorData.error || 'Failed to upload file');
       }
 
-      // Read the file
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const csvData = e.target?.result as string;
-          const parsedData = await parseCSV(csvData) as TimeSeriesData[];
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      if (result.success) {
+        console.log(`Fetching data for dataset ID: ${result.datasetId}`);
+        // Fetch the processed data
+        const dataResponse = await fetch(`/api/data/${result.datasetId}`);
+        
+        if (!dataResponse.ok) {
+          const errorData = await dataResponse.json();
+          console.error('Data retrieval error:', errorData);
+          throw new Error('Failed to retrieve processed data');
+        }
+        
+        const dataResult = await dataResponse.json();
+        console.log('Data retrieval result:', dataResult);
+        
+        if (dataResult.success) {
+          console.log('Data retrieval successful, checking data:');
+          console.log('- Has data property:', !!dataResult.data);
           
-          if (parsedData.length === 0) {
-            throw new Error('No data found in the CSV file');
+          if (dataResult.data) {
+            console.log('- Data is array:', Array.isArray(dataResult.data));
+            console.log('- Data length:', dataResult.data.length);
+            
+            if (dataResult.data.length > 0) {
+              console.log('- Sample data row:', dataResult.data[0]);
+            }
           }
           
-          onDataLoaded(parsedData);
+          // Make sure we're passing an array to onDataLoaded
+          if (dataResult.data && Array.isArray(dataResult.data) && dataResult.data.length > 0) {
+            onDataLoaded(dataResult.data, result.datasetId);
+          } else {
+            console.error('Invalid data format received:', dataResult.data);
+            throw new Error('Invalid data format received from server');
+          }
+          
           setIsLoading(false);
-        } catch (err) {
-          setError(`Error parsing CSV: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          setIsLoading(false);
+        } else {
+          throw new Error(dataResult.error || 'Failed to process data');
         }
-      };
-      
-      reader.onerror = () => {
-        setError('Error reading file');
-        setIsLoading(false);
-      };
-      
-      reader.readAsText(file);
+      } else {
+        throw new Error(result.error || 'Failed to upload file');
+      }
     } catch (err) {
+      console.error('File upload error:', err);
       setError(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setIsLoading(false);
     }
@@ -104,6 +158,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
         Upload a CSV file containing your time series data.
         <br />
         The file should include at least one date column and one numeric column.
+        <br />
+        <strong>Maximum file size: 40MB</strong>
       </Typography>
       
       <Button 
@@ -116,6 +172,15 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
       >
         {isLoading ? 'Uploading...' : 'Select CSV File'}
       </Button>
+      
+      {isLoading && (
+        <Box sx={{ width: '100%', mt: 2, mb: 2 }}>
+          <LinearProgress variant="determinate" value={uploadProgress} />
+          <Typography variant="body2" color="textSecondary" align="center" sx={{ mt: 1 }}>
+            {uploadProgress}% Uploaded
+          </Typography>
+        </Box>
+      )}
       
       {fileName && !error && !isLoading && (
         <Alert severity="success" sx={{ mt: 2, width: '100%' }}>
