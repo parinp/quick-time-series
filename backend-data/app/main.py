@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 
-from app.routers import upload, query
+from app.routers import upload, query, ml_proxy
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +30,7 @@ app.add_middleware(
 # Include routers
 app.include_router(upload.router)
 app.include_router(query.router)
+app.include_router(ml_proxy.router)
 
 @app.get("/")
 async def root():
@@ -37,7 +38,12 @@ async def root():
         "message": "Time Series Analysis API",
         "version": "2.0.0",
         "status": "running",
-        "ml_api": ML_API_URL
+        "ml_api": ML_API_URL,
+        "endpoints": {
+            "/upload": "POST - Upload CSV files for analysis",
+            "/query/{dataset_id}": "GET - Query dataset with optional filters",
+            "/ml/analyze": "POST - Analyze dataset using ML service"
+        }
     }
 
 @app.get("/health")

@@ -1,16 +1,24 @@
 services:
   - type: web
-    name: simple-timeseries-analysis
+    name: timeseries-ml-service
     env: python
     plan: free
-    rootDir: src/app/api/ml
+    rootDir: .
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    startCommand: gunicorn server:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 300
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9
+        value: 3.9.0
       - key: ENVIRONMENT
         value: production
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: DEFAULT_TTL
+        value: 3600
+      - key: ALLOWED_ORIGINS
+        value: "https://simple-timeseries-analysis.vercel.app,https://timeseries-backend.onrender.com"
     autoDeploy: true
     healthCheckPath: /health
     numInstances: 1

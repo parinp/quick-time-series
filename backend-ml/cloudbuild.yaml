@@ -31,6 +31,8 @@ steps:
       - '1'
       - '--timeout'
       - '300s'
-
+      # - '--set-env-vars'
+      # - 'ENVIRONMENT=production, ALLOWED_ORIGINS=https://simple-timeseries-analysis.vercel.app,https://timeseries-backend.onrender.com'
+      
 images:
   - 'gcr.io/$PROJECT_ID/ml-timeseries-analysis' 
