@@ -38,6 +38,8 @@ export const uploadCSV = async (file: File) => {
  * @param offset Number of rows to skip
  * @param sortBy Column to sort by
  * @param sortOrder Sort order (asc or desc)
+ * @param dateColumn Date column for GROUP BY aggregation
+ * @param targetColumn Target column for SUM aggregation
  * @returns Filtered data
  */
 export const queryDataset = async (
@@ -46,8 +48,10 @@ export const queryDataset = async (
   limit: number = 1000,
   offset: number = 0,
   sortBy?: string,
-  sortOrder: 'asc' | 'desc' = 'asc'
-): Promise<{ data: TimeSeriesData[], filtered_row_count: number, total_row_count: number }> => {
+  sortOrder: 'asc' | 'desc' = 'asc',
+  dateColumn?: string,
+  targetColumn?: string
+): Promise<{ data: TimeSeriesData[], filtered_row_count: number, total_row_count: number, aggregated?: boolean }> => {
   try {
     // Build query parameters
     const params = new URLSearchParams({
@@ -64,7 +68,17 @@ export const queryDataset = async (
       params.append('sort_order', sortOrder);
     }
     
-    const response = await fetch(`${API_URL}/query/${datasetId}?${params.toString()}`);
+    // Add date and target columns for aggregation if provided
+    if (dateColumn && targetColumn) {
+      params.append('date_column', dateColumn);
+      params.append('target_column', targetColumn);
+      console.log(`Adding aggregation params: date_column=${dateColumn}, target_column=${targetColumn}`);
+    }
+    
+    const requestUrl = `${API_URL}/query/${datasetId}?${params.toString()}`;
+    console.log(`Sending request to: ${requestUrl}`);
+    
+    const response = await fetch(requestUrl);
     
     if (!response.ok) {
       const errorData = await response.json();

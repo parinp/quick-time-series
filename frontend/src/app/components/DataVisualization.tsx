@@ -39,12 +39,14 @@ interface DataVisualizationProps {
   data: TimeSeriesData[];
   dateColumn: string;
   targetColumn: string;
+  isAggregated?: boolean;
 }
 
 const DataVisualization: React.FC<DataVisualizationProps> = ({ 
   data, 
   dateColumn, 
-  targetColumn 
+  targetColumn,
+  isAggregated = false
 }) => {
   // Try to use DataContext for fallback values
   const dataContext = useData();
@@ -59,6 +61,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     targetColumn,
     effectiveDateColumn,
     effectiveTargetColumn,
+    isAggregated,
     sampleRow: data && data.length > 0 ? data[0] : null
   });
 
@@ -190,24 +193,35 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         setSelectedYears(years);
       }
       
-      // Add time features
-      const dataWithTimeFeatures = addTimeFeatures(processed, effectiveDateColumn);
-      setTimeFeatureData(dataWithTimeFeatures);
-      
-      // Group by month
-      const byMonth = groupBy(dataWithTimeFeatures, 'month', effectiveTargetColumn, 'mean');
-      setMonthlyData(byMonth);
-      
-      // Group by day of week
-      const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', effectiveTargetColumn, 'mean');
-      setDowData(byDow);
+      // If data is already aggregated, skip the additional aggregation steps
+      if (!isAggregated) {
+        // Add time features
+        const dataWithTimeFeatures = addTimeFeatures(processed, effectiveDateColumn);
+        setTimeFeatureData(dataWithTimeFeatures);
+        
+        // Group by month
+        const byMonth = groupBy(dataWithTimeFeatures, 'month', effectiveTargetColumn, 'mean');
+        setMonthlyData(byMonth);
+        
+        // Group by day of week
+        const byDow = groupBy(dataWithTimeFeatures, 'day_of_week', effectiveTargetColumn, 'mean');
+        setDowData(byDow);
+      } else {
+        // For aggregated data, we can still compute time features but the data is already grouped
+        const dataWithTimeFeatures = addTimeFeatures(processed, effectiveDateColumn);
+        setTimeFeatureData(dataWithTimeFeatures);
+        
+        // Use the existing aggregation for visualizations
+        setMonthlyData([]);
+        setDowData([]);
+      }
       
       setError(null);
     } catch (err) {
       console.error('Error processing data:', err);
       setError(`Error processing data: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [data, effectiveDateColumn, effectiveTargetColumn]);
+  }, [data, effectiveDateColumn, effectiveTargetColumn, isAggregated]);
 
   const handleChartChange = (event: SelectChangeEvent) => {
     setSelectedChart(event.target.value);
@@ -547,6 +561,12 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
               </Typography>
             </Box>
           )}
+        </Alert>
+      )}
+      
+      {isAggregated && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Data is aggregated: {effectiveDateColumn} is grouped by day with SUM of {effectiveTargetColumn}.
         </Alert>
       )}
       

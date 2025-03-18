@@ -22,6 +22,7 @@ export default function UploadPage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [ttlInfo, setTtlInfo] = useState<string | null>(null);
+  const [isAggregated, setIsAggregated] = useState<boolean>(false);
 
   const handleDataLoaded = async (uploadedData: TimeSeriesData[], uploadedDatasetId?: string) => {
     if (!uploadedDatasetId) {
@@ -70,17 +71,32 @@ export default function UploadPage() {
       setIsLoading(true);
       setError(null);
       
+      // If we have both date and target columns, use aggregation 
+      // (SUM of target column grouped by date)
+      const useAggregation = isAnalyzing && dateColumn && targetColumn;
+      
+      console.log('loadData debug:', {
+        datasetId,
+        dateColumn,
+        targetColumn,
+        isAnalyzing,
+        useAggregation
+      });
+      
       const response = await queryDataset(
         datasetId,
         filters,
         1000,  // Limit to 1000 rows
         0,     // No offset
         dateColumn || undefined,
-        'asc'
+        'asc',
+        useAggregation ? dateColumn : undefined,
+        useAggregation ? targetColumn : undefined
       );
       
       if (response.data && Array.isArray(response.data)) {
         setData(response.data);
+        setIsAggregated(!!response.aggregated);
       } else {
         throw new Error('Invalid data format received from server');
       }
@@ -104,21 +120,76 @@ export default function UploadPage() {
       }
     }
     
+    // Update state values
     setDateColumn(dateCol);
     setTargetColumn(targetCol);
-    
-    // Also update the context
     setContextDateColumn(dateCol);
     setContextTargetColumn(targetCol);
-    
     setIsAnalyzing(true);
+    setIsLoading(true);
     
-    // Reload data with the selected columns for sorting
-    loadData();
+    // Make a single API call with the aggregation parameters
+    console.log('Loading data with aggregation:', dateCol, targetCol);
+    
+    queryDataset(
+      datasetId as string,
+      {}, // no filters
+      1000,
+      0,
+      dateCol,
+      'asc',
+      dateCol, // explicitly use dateCol for aggregation
+      targetCol // explicitly use targetCol for aggregation
+    ).then(response => {
+      if (response.data && Array.isArray(response.data)) {
+        setData(response.data);
+        setIsAggregated(!!response.aggregated);
+        console.log('Data loaded with aggregation, rows:', response.data.length, 'aggregated:', response.aggregated);
+      } else {
+        throw new Error('Invalid data format received from server');
+      }
+    }).catch(err => {
+      console.error('Error loading data with aggregation:', err);
+      setError(err instanceof Error ? err.message : 'Failed to query dataset');
+    }).finally(() => {
+      setIsLoading(false);
+    });
   };
 
   const handleApplyFilters = (filters: Record<string, { operator: string, value: any }>) => {
-    loadData(filters);
+    if (!dateColumn || !targetColumn || !isAnalyzing) {
+      // If we don't have columns selected yet, just use the standard method
+      loadData(filters);
+      return;
+    }
+    
+    // If we have columns selected, make a direct call with aggregation
+    setIsLoading(true);
+    setError(null);
+    
+    queryDataset(
+      datasetId as string,
+      filters,
+      1000,
+      0,
+      dateColumn,
+      'asc',
+      dateColumn, // explicitly use dateColumn for aggregation
+      targetColumn // explicitly use targetColumn for aggregation
+    ).then(response => {
+      if (response.data && Array.isArray(response.data)) {
+        setData(response.data);
+        setIsAggregated(!!response.aggregated);
+        console.log('Filtered data with aggregation, rows:', response.data.length, 'aggregated:', response.aggregated);
+      } else {
+        throw new Error('Invalid data format received from server');
+      }
+    }).catch(err => {
+      console.error('Error applying filters with aggregation:', err);
+      setError(err instanceof Error ? err.message : 'Failed to query dataset');
+    }).finally(() => {
+      setIsLoading(false);
+    });
   };
 
   return (
@@ -175,24 +246,13 @@ export default function UploadPage() {
       
       {isDataLoaded && isAnalyzing && datasetId && columns.length > 0 && (
         <>
-          <DataFilter 
-            columns={columns}
-            datasetId={datasetId}
-            onApplyFilters={handleApplyFilters}
-          />
-          
           {data.length > 0 && dateColumn && targetColumn && (
             <DataVisualization 
               data={data}
               dateColumn={dateColumn}
               targetColumn={targetColumn}
+              isAggregated={isAggregated}
             />
-          )}
-          
-          {data.length === 0 && (
-            <Alert severity="warning" sx={{ mb: 3 }}>
-              No data matches your filter criteria. Try adjusting your filters.
-            </Alert>
           )}
         </>
       )}

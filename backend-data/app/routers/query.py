@@ -20,6 +20,8 @@ async def query_dataset(
     offset: Optional[int] = Query(0, description="Number of rows to skip"),
     sort_by: Optional[str] = Query(None, description="Column to sort by"),
     sort_order: Optional[str] = Query("asc", description="Sort order (asc or desc)"),
+    date_column: Optional[str] = Query(None, description="Date column for GROUP BY"),
+    target_column: Optional[str] = Query(None, description="Target column for aggregation (SUM)"),
 ):
     """
     Query a dataset with filters.
@@ -27,6 +29,7 @@ async def query_dataset(
     - Retrieves Parquet data from Redis
     - Loads into DuckDB for efficient querying
     - Returns only the filtered data
+    - If date_column and target_column are provided, performs GROUP BY on date_column with SUM on target_column
     
     Filters format example:
     {
@@ -35,6 +38,16 @@ async def query_dataset(
     }
     """
     try:
+        # Debug logs for request parameters
+        print(f"Query parameters received:")
+        print(f"dataset_id: {dataset_id}")
+        print(f"limit: {limit}")
+        print(f"offset: {offset}")
+        print(f"sort_by: {sort_by}")
+        print(f"sort_order: {sort_order}")
+        print(f"date_column: {date_column}")
+        print(f"target_column: {target_column}")
+        
         # Retrieve data from Redis
         data = await retrieve_data(dataset_id)
         
@@ -65,6 +78,20 @@ async def query_dataset(
                 print(f"Invalid filter column: {column} not in {available_columns}")
                 raise HTTPException(status_code=400, detail=f"Filter column '{column}' not found in dataset columns")
         
+        # Validate aggregation columns
+        aggregate = None
+        if date_column and target_column:
+            if date_column not in available_columns:
+                raise HTTPException(status_code=400, detail=f"Date column '{date_column}' not found in dataset columns")
+            if target_column not in available_columns:
+                raise HTTPException(status_code=400, detail=f"Target column '{target_column}' not found in dataset columns")
+            
+            print(f"Using aggregation: GROUP BY {date_column}, SUM({target_column})")
+            aggregate = {
+                'date_column': date_column,
+                'target_column': target_column
+            }
+        
         # Query the data using DuckDB
         try:
             result = await query_parquet_data(
@@ -72,8 +99,9 @@ async def query_dataset(
                 filter_dict,
                 limit,
                 offset,
-                sort_by,
-                sort_order
+                sort_by or date_column,  # If no sort_by is provided but we're aggregating, sort by date
+                sort_order,
+                aggregate
             )
             
             print(f"Query returned {len(result)} rows out of {data.get('row_count', 0)}")
@@ -84,7 +112,8 @@ async def query_dataset(
                 "dataset_id": dataset_id,
                 "filtered_row_count": len(result),
                 "total_row_count": data.get("row_count", 0),
-                "data": result
+                "data": result,
+                "aggregated": aggregate is not None
             }
         except Exception as e:
             print(f"DuckDB query error: {str(e)}")

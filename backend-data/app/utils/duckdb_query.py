@@ -13,7 +13,8 @@ async def query_parquet_data(
     limit: int = 1000,
     offset: int = 0,
     sort_by: Optional[str] = None,
-    sort_order: str = "asc"
+    sort_order: str = "asc",
+    aggregate: Optional[Dict[str, str]] = None
 ) -> List[Dict[str, Any]]:
     """
     Query Parquet data using DuckDB.
@@ -25,6 +26,7 @@ async def query_parquet_data(
         offset: Number of rows to skip
         sort_by: Column to sort by
         sort_order: Sort order (asc or desc)
+        aggregate: Dictionary with 'date_column' and 'target_column' for groupby aggregation
         
     Returns:
         List of dictionaries, each representing a row
@@ -65,7 +67,14 @@ async def query_parquet_data(
             con.register("data", table)
         
         # Build the query
-        query = "SELECT * FROM data"
+        if aggregate and 'date_column' in aggregate and 'target_column' in aggregate:
+            # Use GROUP BY with SUM aggregation
+            date_column = aggregate['date_column']
+            target_column = aggregate['target_column']
+            query = f"SELECT {date_column}, SUM({target_column}) as {target_column} FROM data"
+        else:
+            # Standard query without aggregation
+            query = "SELECT * FROM data"
         
         # Add filters if provided
         where_clauses = []
@@ -92,6 +101,10 @@ async def query_parquet_data(
         # Add WHERE clause if there are filters
         if where_clauses:
             query += " WHERE " + " AND ".join(where_clauses)
+            
+        # Add GROUP BY if using aggregation
+        if aggregate and 'date_column' in aggregate and 'target_column' in aggregate:
+            query += f" GROUP BY {aggregate['date_column']}"
         
         # Add ORDER BY clause if sort_by is provided
         if sort_by:
@@ -109,7 +122,11 @@ async def query_parquet_data(
             print(f"DuckDB query error: {str(query_error)}")
             # Try with a more fault-tolerant approach
             print("Trying a simplified query...")
-            result = con.execute(f"SELECT * FROM data LIMIT {limit} OFFSET {offset}").fetchdf()
+            if aggregate and 'date_column' in aggregate and 'target_column' in aggregate:
+                fallback_query = f"SELECT {aggregate['date_column']}, SUM({aggregate['target_column']}) as {aggregate['target_column']} FROM data GROUP BY {aggregate['date_column']} LIMIT {limit} OFFSET {offset}"
+            else:
+                fallback_query = f"SELECT * FROM data LIMIT {limit} OFFSET {offset}"
+            result = con.execute(fallback_query).fetchdf()
         
         # Convert to list of dictionaries
         records = result.to_dict(orient='records')
