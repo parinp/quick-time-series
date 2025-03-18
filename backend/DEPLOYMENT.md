@@ -22,7 +22,7 @@ This guide walks you through deploying the backend timeseries analysis service t
    - Start Command: `gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
    - Select the Free plan (or higher if needed)
 5. Add the following environment variables:
-   - `PYTHON_VERSION`: 3.11
+   - `PYTHON_VERSION`: 3.11.0
    - `ENVIRONMENT`: production
    - `UPSTASH_REDIS_REST_URL`: Your Upstash Redis REST URL
    - `UPSTASH_REDIS_REST_TOKEN`: Your Upstash Redis REST token
