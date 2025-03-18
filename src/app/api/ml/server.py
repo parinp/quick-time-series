@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import uvicorn
 import logging
+import os
 from utils import analyze_data
 
 # Configure logging
@@ -20,6 +21,9 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Get port from environment variable for Cloud Run
+PORT = int(os.getenv("PORT", "8080"))
+
 # Add CORS middleware to allow cross-origin requests
 app.add_middleware(
     CORSMiddleware,
@@ -27,6 +31,7 @@ app.add_middleware(
         "http://localhost:3000",  # Local development
         "http://localhost:8000",  # Local API development
         "https://simple-timeseries-analysis.vercel.app",  # Vercel production
+        "https://simple-timeseries-analysis.onrender.com",  # Render backend
         "*",  # Allow all origins during development
     ],
     allow_credentials=True,
@@ -85,6 +90,7 @@ async def root():
     return {
         "message": "Welcome to the ML Analysis API",
         "version": "1.0.0",
+        "environment": os.getenv("ENVIRONMENT", "development"),
         "endpoints": {
             "/": "GET - This information",
             "/analyze": "POST - Analyze time series data",
@@ -101,4 +107,4 @@ async def health_check():
 
 # Run the server if this file is executed directly
 if __name__ == "__main__":
-    uvicorn.run("server:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("server:app", host="0.0.0.0", port=PORT, reload=False) 

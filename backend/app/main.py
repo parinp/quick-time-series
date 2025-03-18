@@ -8,6 +8,9 @@ from app.routers import upload, query
 # Load environment variables
 load_dotenv()
 
+# Get ML API URL from environment variables
+ML_API_URL = os.getenv("ML_API_URL", "http://localhost:8080")
+
 app = FastAPI(
     title="Time Series Analysis API",
     description="API for time series data analysis with CSV to Parquet conversion and DuckDB querying",
@@ -15,9 +18,10 @@ app = FastAPI(
 )
 
 # Configure CORS
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,7 +36,8 @@ async def root():
     return {
         "message": "Time Series Analysis API",
         "version": "2.0.0",
-        "status": "running"
+        "status": "running",
+        "ml_api": ML_API_URL
     }
 
 @app.get("/health")
