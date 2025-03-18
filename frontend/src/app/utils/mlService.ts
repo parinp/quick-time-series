@@ -1,7 +1,9 @@
 import { TimeSeriesData } from './types';
 
 // API base URL - use environment variable or fallback to local development
-const API_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_ML_API_URL || 'http://localhost:8080';
+// Backend API URL for the data service
+const BACKEND_API_URL = process.env.NEXT_PUBLIC_BACKEND_API_URL || 'http://localhost:8000';
 
 /**
  * Interface for ML analysis results
@@ -93,6 +95,80 @@ export async function analyzeData(
     return await response.json();
   } catch (error) {
     console.error('Error analyzing data:', error);
+    throw error;
+  }
+}
+
+/**
+ * Analyze data from a dataset ID using Redis and the ML service
+ * 
+ * This optimized approach uses Redis to pass data between services:
+ * 1. Calls the backend-data proxy endpoint
+ * 2. The backend-data verifies the dataset exists
+ * 3. The backend-data calls the ML service with the dataset ID
+ * 4. The ML service retrieves the data from Redis and processes it
+ * 5. The ML service cleans up the data after processing
+ * 
+ * @param datasetId The ID of the dataset in Redis
+ * @param dateColumn The name of the date column
+ * @param targetColumn The name of the target column
+ * @param multipleWaterfallPlots Whether to generate multiple waterfall plots
+ * @returns Promise with the analysis results
+ */
+export async function analyzeDataFromDatasetId(
+  datasetId: string,
+  dateColumn: string,
+  targetColumn: string,
+  multipleWaterfallPlots: boolean = false
+): Promise<MLAnalysisResults> {
+  try {
+    console.log(`Sending Redis-based analysis request for dataset ${datasetId}`);
+    console.log(`Using date column: "${dateColumn}", target column: "${targetColumn}"`);
+    
+    // We call the backend-data proxy endpoint instead of the ML service directly
+    const response = await fetch(`${BACKEND_API_URL}/ml/analyze`, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      mode: 'cors',
+      credentials: 'omit',
+      body: JSON.stringify({
+        dataset_id: datasetId,
+        date_column: dateColumn,
+        target_column: targetColumn,
+        multiple_waterfall_plots: multipleWaterfallPlots,
+        // Optionally exclude columns that are known to be unhelpful
+        exclude_columns: []
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      let errorMessage = 'Failed to analyze data';
+      
+      console.error('API error response:', errorData);
+      
+      // Extract detailed error message if available
+      if (errorData.detail) {
+        if (typeof errorData.detail === 'string') {
+          errorMessage = errorData.detail;
+        } else if (errorData.detail.message) {
+          errorMessage = errorData.detail.message;
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
+
+    const responseData = await response.json();
+    console.log('Analysis completed successfully');
+    
+    // The results are nested inside the response
+    return responseData.results;
+  } catch (error) {
+    console.error('Error analyzing data from dataset ID:', error);
     throw error;
   }
 }

@@ -40,13 +40,15 @@ interface DataVisualizationProps {
   dateColumn: string;
   targetColumn: string;
   isAggregated?: boolean;
+  datasetId?: string;
 }
 
 const DataVisualization: React.FC<DataVisualizationProps> = ({ 
   data, 
   dateColumn, 
   targetColumn,
-  isAggregated = false
+  isAggregated = false,
+  datasetId
 }) => {
   // Try to use DataContext for fallback values
   const dataContext = useData();
@@ -679,6 +681,7 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
         data={processedData}
         dateColumn={effectiveDateColumn}
         targetColumn={effectiveTargetColumn}
+        datasetId={datasetId}
       />
     </Box>
   );

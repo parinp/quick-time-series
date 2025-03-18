@@ -252,6 +252,7 @@ export default function UploadPage() {
               dateColumn={dateColumn}
               targetColumn={targetColumn}
               isAggregated={isAggregated}
+              datasetId={datasetId}
             />
           )}
         </>

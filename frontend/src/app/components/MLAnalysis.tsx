@@ -23,19 +23,21 @@ import {
 import InfoIcon from '@mui/icons-material/Info';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { TimeSeriesData } from '../utils/types';
-import { analyzeData, checkApiHealth, getShapDescriptions, MLAnalysisResults } from '../utils/mlService';
+import { analyzeData, analyzeDataFromDatasetId, checkApiHealth, getShapDescriptions, MLAnalysisResults } from '../utils/mlService';
 import { useData } from '../utils/DataContext';
 
 interface MLAnalysisProps {
   data: TimeSeriesData[];
   dateColumn: string;
   targetColumn: string;
+  datasetId?: string;
 }
 
 const MLAnalysis: React.FC<MLAnalysisProps> = ({
   data,
   dateColumn,
   targetColumn,
+  datasetId
 }) => {
   // Try to use DataContext, but fall back to props if not available
   const dataContext = useData();
@@ -108,21 +110,36 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
           throw new Error(errorMsg);
         }
         
-        // Create a copy of the data specifically for the ML API
-        // This ensures we don't modify the original data used by other components
-        const mlData = preparedData.map(item => {
-          const newItem = { ...item };
-          
-          // Ensure date is in string format for the ML API
-          if (newItem[effectiveDateColumn] instanceof Date) {
-            newItem[effectiveDateColumn] = newItem[effectiveDateColumn].toISOString();
-          }
-          
-          return newItem;
-        });
+        let analysisResults;
         
-        // Request multiple waterfall plots for different examples
-        const analysisResults = await analyzeData(mlData, effectiveDateColumn, effectiveTargetColumn, true);
+        // If we have a dataset ID, use the optimized Redis-based approach
+        if (datasetId) {
+          console.log(`Using optimized Redis-based approach with dataset ID: ${datasetId}`);
+          analysisResults = await analyzeDataFromDatasetId(
+            datasetId,
+            effectiveDateColumn,
+            effectiveTargetColumn,
+            true // Always use multiple waterfall plots
+          );
+        } else {
+          // Otherwise, use the standard approach with data in memory
+          console.log('Using standard in-memory approach');
+          // Create a copy of the data specifically for the ML API
+          const mlData = preparedData.map(item => {
+            const newItem = { ...item };
+            
+            // Ensure date is in string format for the ML API
+            if (newItem[effectiveDateColumn] instanceof Date) {
+              newItem[effectiveDateColumn] = newItem[effectiveDateColumn].toISOString();
+            }
+            
+            return newItem;
+          });
+          
+          // Request multiple waterfall plots for different examples
+          analysisResults = await analyzeData(mlData, effectiveDateColumn, effectiveTargetColumn, true);
+        }
+        
         setResults(analysisResults);
       } else {
         throw new Error('No data available for analysis');
@@ -134,7 +151,7 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [preparedData, effectiveDateColumn, effectiveTargetColumn, loading]);
+  }, [preparedData, effectiveDateColumn, effectiveTargetColumn, loading, datasetId]);
   
   // Check if the API is available when the component mounts
   useEffect(() => {
@@ -153,14 +170,6 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     
     checkApi();
   }, []);
-  
-  // Automatically run analysis when API is available
-  useEffect(() => {
-    if (apiAvailable === true && !results && !loading && !analysisInitiated && preparedData.length > 0) {
-      console.log('Auto-running analysis with columns:', { effectiveDateColumn, effectiveTargetColumn });
-      handleAnalyze();
-    }
-  }, [apiAvailable, results, loading, analysisInitiated, handleAnalyze, preparedData.length, effectiveDateColumn, effectiveTargetColumn]);
   
   // Add a comment to clarify data source
   useEffect(() => {
@@ -423,7 +432,7 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
         <Alert severity="info" sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <CircularProgress size={20} sx={{ mr: 2 }} />
-            <Typography>Checking ML API availability... Analysis will run automatically when ready.</Typography>
+            <Typography>Checking ML API availability...</Typography>
           </Box>
         </Alert>
       );
@@ -436,10 +445,10 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             ML API Server Not Available
           </Typography>
           <Typography variant="body2" paragraph>
-            The ML API server is not running. Machine learning analysis is not available at this time.
+            The machine learning analysis requires a separate API server to be running.
           </Typography>
           <Typography variant="body2">
-            You can still use all other features of the application. The ML analysis requires a separate server component.
+            You can still use all other features of the application.
           </Typography>
         </Alert>
       );
@@ -447,11 +456,21 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     
     if (apiAvailable === true && !results && !loading && !analysisInitiated) {
       return (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography>ML API is available. Analysis will start automatically.</Typography>
-          </Box>
-        </Alert>
+        <Box sx={{ mb: 3 }}>
+          <Alert severity="success" sx={{ mb: 2 }}>
+            <Typography>ML API is available. Click the button below to run the analysis.</Typography>
+          </Alert>
+          <Button 
+            variant="contained" 
+            color="primary" 
+            onClick={handleAnalyze}
+            disabled={loading}
+            startIcon={loading && <CircularProgress size={16} color="inherit" />}
+            fullWidth
+          >
+            Run ML Analysis
+          </Button>
+        </Box>
       );
     }
     
