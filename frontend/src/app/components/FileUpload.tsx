@@ -18,8 +18,8 @@ interface FileUploadProps {
   onDataLoaded: (data: TimeSeriesData[], datasetId?: string) => void;
 }
 
-// Maximum file size (50MB)
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+// Maximum file size (25MB)
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 
 const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -34,7 +34,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
 
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
-      setError(`File size exceeds the 50MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      setError(`File size exceeds the 25MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
       return;
     }
 
@@ -128,7 +128,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded }) => {
         <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 2 }}>
           Drag and drop a CSV file here, or click to select a file.
           <br />
-          Maximum file size: 50MB
+          Maximum file size: 25MB
           <br />
           <em>Data will be available for 15 minutes after upload</em>
         </Typography>

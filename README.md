@@ -6,7 +6,7 @@ An interactive web application for time series data visualization and analysis, 
 
 - **Interactive Data Visualization**: Visualize time series data with various chart types including line charts, bar charts, histograms, and box plots.
 - **Sample Data Analysis**: Explore the Rossmann Store Sales dataset with data from Supabase.
-- **Custom Data Upload**: Upload your own CSV files for analysis (up to 40MB).
+- **Custom Data Upload**: Upload your own CSV files for analysis (up to 25MB).
 - **CSV to Parquet Conversion**: Automatically converts CSV data to Parquet format for efficient storage.
 - **Redis Caching**: Uses Upstash Redis for in-memory caching of uploaded data.
 - **Time Pattern Detection**: Analyze patterns by month, day of week, and other time dimensions.
@@ -17,7 +17,7 @@ An interactive web application for time series data visualization and analysis, 
 ## User Upload Version 2 Implementation Checklist
 
 ### Frontend (React with Vercel Free Tier)
-- [x] Update file upload component to handle larger files (up to 50MB)
+- [x] Update file upload component to handle larger files (up to 25MB)
 - [x] Implement chunked file upload for large CSV files
 - [x] Add progress indicator for file uploads
 - [x] Create filter UI for querying data from Redis/DuckDB
@@ -33,7 +33,7 @@ An interactive web application for time series data visualization and analysis, 
 - [x] Add data cleanup mechanism for expired data
 
 ### Data Flow Implementation
-- [x] User uploads CSV (up to 50MB) → Backend converts to Parquet
+- [x] User uploads CSV (up to 25MB) → Backend converts to Parquet
 - [x] Parquet is stored in Upstash Redis with TTL-based auto-delete
 - [x] When user applies filters, backend queries Redis, loads Parquet into DuckDB
 - [x] Only filtered data is sent back to frontend for faster response
@@ -56,7 +56,7 @@ The application follows a modern architecture with separate frontend and backend
 - Redis for caching with TTL-based auto-delete
 
 ### Data Flow
-1. User uploads CSV (up to 50MB) → Backend converts to Parquet
+1. User uploads CSV (up to 25MB) → Backend converts to Parquet
 2. Parquet is stored in Upstash Redis with TTL-based auto-delete
 3. When user applies filters, backend queries Redis, loads Parquet into DuckDB
 4. Only filtered data is sent back to frontend for faster response
@@ -224,7 +224,7 @@ You should see a response: `{"status":"healthy"}`
 ### Custom Data Upload
 
 1. Navigate to the "Upload Data" page from the navigation bar.
-2. Click "Select CSV File" and choose a CSV file from your computer (max 40MB).
+2. Click "Select CSV File" and choose a CSV file from your computer (max 25MB).
 3. The file will be uploaded, converted to Parquet format, and cached in Redis.
 4. Once uploaded, select the date column and target column from your data.
 5. Click "Analyze" to generate visualizations and statistics.

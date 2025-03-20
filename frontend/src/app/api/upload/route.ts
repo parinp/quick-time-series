@@ -4,8 +4,8 @@ import { parseCSV } from '@/app/utils/dataProcessing';
 import { convertToParquet } from '@/app/utils/parquetConverter';
 import { storeData } from '@/app/utils/redisClient';
 
-// Maximum file size (40MB)
-const MAX_FILE_SIZE = 40 * 1024 * 1024; // 40MB in bytes
+// Maximum file size (25MB)
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB in bytes
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     const contentLength = request.headers.get('content-length');
     if (contentLength && parseInt(contentLength) > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File size exceeds the 40MB limit' },
+        { error: 'File size exceeds the 25MB limit' },
         { status: 413 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     // Check file size
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File size exceeds the 40MB limit' },
+        { error: 'File size exceeds the 25MB limit' },
         { status: 413 }
       );
     }

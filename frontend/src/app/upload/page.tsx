@@ -201,7 +201,7 @@ export default function UploadPage() {
       <Typography variant="body1" paragraph color="text.primary">
         Upload a CSV file containing your time series data for analysis and visualization. 
         The file should include at least one date column and one numeric column for analysis.
-        Maximum file size: 50MB.
+        Maximum file size: 25MB.
       </Typography>
       
       {ttlInfo && (

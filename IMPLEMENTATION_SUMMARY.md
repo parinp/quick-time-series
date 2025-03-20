@@ -17,7 +17,7 @@ We've implemented a modern web application for time series data analysis with th
    - Redis for caching with TTL-based auto-delete
 
 3. **Data Flow**
-   - User uploads CSV (up to 50MB) → Backend converts to Parquet
+   - User uploads CSV (up to 25MB) → Backend converts to Parquet
    - Parquet is stored in Upstash Redis with TTL-based auto-delete
    - When user applies filters, backend queries Redis, loads Parquet into DuckDB
    - Only filtered data is sent back to frontend for faster response
@@ -26,7 +26,7 @@ We've implemented a modern web application for time series data analysis with th
 ## Key Features Implemented
 
 ### Frontend
-- Enhanced file upload component supporting files up to 50MB
+- Enhanced file upload component supporting files up to 25MB
 - Progress indicator for file uploads
 - Data retention selection (1 hour, 1 day, 1 week)
 - Flexible filtering interface for querying data

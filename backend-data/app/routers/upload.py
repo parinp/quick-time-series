@@ -15,8 +15,8 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# Maximum file size (50MB)
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+# Maximum file size (25MB)
+MAX_FILE_SIZE = 25 * 1024 * 1024  # 25MB in bytes
 
 @router.post("/")
 async def upload_file(
@@ -43,7 +43,7 @@ async def upload_file(
         
         # Check file size
         if len(contents) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail=f"File size exceeds the 50MB limit")
+            raise HTTPException(status_code=413, detail=f"File size exceeds the 25MB limit")
         
         # Parse CSV data
         try:

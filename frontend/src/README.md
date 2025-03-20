@@ -4,7 +4,7 @@ This is the frontend for the Time Series Analysis application. It provides a use
 
 ## Features
 
-- Upload CSV files (up to 50MB)
+- Upload CSV files (up to 25MB)
 - Filter data using a flexible query interface
 - Visualize time series data with various chart types
 - TTL-based data storage with auto-delete
