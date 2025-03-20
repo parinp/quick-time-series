@@ -29,4 +29,4 @@ ENV ENVIRONMENT=production
 EXPOSE 8080
 
 # Command to run the application with gunicorn for production
-CMD gunicorn --bind 0.0.0.0:$PORT --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 300 server:app 
+CMD gunicorn --bind 0.0.0.0:$PORT --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 300 app.main:app 
