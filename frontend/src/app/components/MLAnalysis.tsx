@@ -178,9 +178,24 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   }, [preparedData.length, effectiveDateColumn, effectiveTargetColumn]);
   
   const renderMetrics = () => {
-    if (!results) return null;
+    if (!results || !results.metrics) return null;
     
-    const { metrics } = results;
+    // First extract the values we need with fallbacks
+    const testRmse = 'test_rmse' in results.metrics 
+      ? results.metrics.test_rmse 
+      : ('rmse' in results.metrics ? (results.metrics as any).rmse : 0);
+      
+    const testR2 = 'test_r2' in results.metrics 
+      ? results.metrics.test_r2 
+      : ('r2' in results.metrics ? (results.metrics as any).r2 : 0);
+    
+    // Create a safe metrics object
+    const metrics = {
+      train_rmse: results.metrics.train_rmse ?? 0,
+      train_r2: results.metrics.train_r2 ?? 0,
+      test_rmse: testRmse,
+      test_r2: testR2,
+    };
     
     return (
       <Card sx={{ bgcolor: '#1a1f2c', color: 'white', mb: 3 }}>

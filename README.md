@@ -163,59 +163,54 @@ The application includes a machine learning component that requires a separate P
 
 ### Starting the ML Server
 
-#### Windows
-Run the included batch file:
+There are two ML backend options:
+1. The standard backend (`backend-ml`) with full ML capabilities
+2. The data backend (`backend-data`) for data processing and ML proxying
+
+#### Starting Both Backends
+
+Run the following commands in separate terminal windows:
+
 ```bash
-run_ml_server.bat
+# Start the ML backend
+cd backend-ml
+python server.py
+
+# Start the data backend in another terminal
+cd backend-data
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-#### macOS/Linux
-Run the included shell script:
-```bash
-chmod +x run_ml_server.sh
-./run_ml_server.sh
-```
+The ML API server will be available at http://localhost:8080, and the data API will be available at http://localhost:8000.
 
-#### Manual Start
-You can also start the server manually:
-```bash
-cd src/app/api/ml
-python run_local_server.py
-```
+### Memory-Efficient ML Implementation
 
-The ML API server will be available at http://localhost:8000. The main application will automatically connect to this server when it's running.
+The application includes a memory-efficient ML implementation optimized for environments with limited resources, such as the GCP Cloud Run free tier (256MB memory, 1 vCPU).
+
+#### Key Features
+
+- **Memory-Optimized Processing**: Processes data in chunks to keep memory usage under 256MB
+- **Single-CPU Optimization**: All operations are optimized for a single CPU environment
+- **Chunked Processing Strategy**: Intelligently processes data in chunks with dynamic adjustment
+- **Resource Monitoring**: Tracks memory usage and processing time with detailed reports
+
+#### When to Use Memory-Efficient ML
+
+Use the memory-efficient implementation when:
+- Running in resource-constrained environments (e.g., GCP Cloud Run free tier)
+- Processing large datasets that may exceed memory limits
+- Needing detailed resource usage metrics and estimates
+
+For most development and testing purposes, the standard ML endpoint is sufficient.
 
 ### Testing the ML Server
 
 To verify the ML server is running correctly, visit:
 ```
-http://localhost:8000/health
+http://localhost:8080/health
 ```
 
 You should see a response: `{"status":"healthy"}`
-
-### Testing with Custom Column Names
-
-The ML API now supports any column names for date and target values. To test this functionality:
-
-#### Windows
-```bash
-test_ml_api.bat
-```
-
-#### macOS/Linux
-```bash
-chmod +x test_ml_api.sh
-./test_ml_api.sh
-```
-
-#### Manual Test
-```bash
-cd src/app/api/ml
-python test_api.py
-```
-
-This test script generates sample data with custom column names (`Date_custom` and `Sales_custom`) and sends it to the API for analysis. If successful, it will display the model metrics and feature importance.
 
 ## Usage
 

@@ -11,6 +11,10 @@ import json
 import os
 from datetime import datetime
 from typing import List, Dict, Any, Optional
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_column: str, test_size: float = 0.2, random_state: int = 42):
     """
@@ -29,8 +33,8 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     # Convert to DataFrame
     df = pd.DataFrame(data)
     
-    print(f"Training XGBoost model with date column: '{date_column}' and target column: '{target_column}'")
-    print(f"DataFrame columns: {df.columns.tolist()}")
+    logger.info(f"Training XGBoost model with date column: '{date_column}' and target column: '{target_column}'")
+    logger.info(f"DataFrame columns: {df.columns.tolist()}")
     
     # Verify columns exist
     if date_column not in df.columns:
@@ -42,14 +46,13 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     # Convert date column to datetime
     try:
         df[date_column] = pd.to_datetime(df[date_column])
-        print(f"Successfully converted '{date_column}' to datetime")
+        logger.info(f"Successfully converted '{date_column}' to datetime")
     except Exception as e:
-        print(f"Error converting '{date_column}' to datetime: {str(e)}")
-        print(f"Sample values: {df[date_column].head().tolist()}")
+        logger.error(f"Error converting '{date_column}' to datetime: {str(e)}")
+        logger.error(f"Sample values: {df[date_column].head().tolist()}")
         raise ValueError(f"Could not convert '{date_column}' to datetime. Make sure it contains valid date values.")
     
     # Extract features from date
-    # print(f"Extracting time features from '{date_column}'")
     # df['year'] = df[date_column].dt.year
     # df['month'] = df[date_column].dt.month
     # df['day'] = df[date_column].dt.day
@@ -60,28 +63,29 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
     features = df.drop([date_column, target_column], axis=1)
     target = df[target_column]
     
-    print(f"Feature columns: {features.columns.tolist()}")
-    print(f"Target column: '{target_column}' with {len(target)} values")
+    logger.info(f"Feature columns: {features.columns.tolist()}")
+    logger.info(f"Target column: '{target_column}' with {len(target)} values")
     
     # Handle categorical columns
     # First, identify categorical columns (object dtype)
     categorical_columns = features.select_dtypes(include=['object']).columns.tolist()
     
     if categorical_columns:
-        print(f"Found categorical columns: {categorical_columns}")
+        logger.info(f"Found categorical columns: {categorical_columns}")
         # Convert categorical columns to numeric using one-hot encoding
         features = pd.get_dummies(features, columns=categorical_columns, drop_first=True)
-        print(f"After one-hot encoding, feature columns: {features.columns.tolist()}")
+        logger.info(f"After one-hot encoding, feature columns: {features.columns.tolist()}")
     
     # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
         features, target, test_size=test_size, random_state=random_state
     )
     
-    print(f"Training set size: {len(X_train)}, Test set size: {len(X_test)}")
+    logger.info(f"Training set size: {len(X_train)}, Test set size: {len(X_test)}")
     
     # Train the XGBoost model
     model = xgb.XGBRegressor(
+        tree_method='hist',
         n_estimators=100,
         learning_rate=0.1,
         max_depth=5,
@@ -106,7 +110,7 @@ def train_xgboost_model(data: List[Dict[str, Any]], date_column: str, target_col
         'test_r2': float(test_r2)
     }
     
-    print(f"Model metrics: {metrics}")
+    logger.info(f"Model metrics: {metrics}")
     
     return {
         'model': model,
@@ -135,7 +139,7 @@ def generate_shap_plots(model_data: Dict[str, Any], multiple_waterfall_plots: bo
     
     # Create a SHAP explainer
     explainer = shap.Explainer(model)
-    shap_values = explainer(X_test,check_additivity=False)
+    shap_values = explainer(X_test, check_additivity=False)
     
     # Generate and save plots
     plots = {}
@@ -246,14 +250,14 @@ def get_feature_importance(model_data: Dict[str, Any]):
         for feature, score in zip(feature_names, importance)
     ]
     
-    # Sort by importance
+    # Sort by importance (descending)
     feature_importance.sort(key=lambda x: x['importance'], reverse=True)
     
     return feature_importance
 
 def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: str, multiple_waterfall_plots: bool = False):
     """
-    Analyze the data using XGBoost and SHAP.
+    Analyze data using XGBoost and SHAP.
     
     Args:
         data: List of dictionaries containing the data
@@ -262,40 +266,23 @@ def analyze_data(data: List[Dict[str, Any]], date_column: str, target_column: st
         multiple_waterfall_plots: Whether to generate multiple waterfall plots for different examples
         
     Returns:
-        Dictionary containing analysis results
+        Dictionary containing metrics, feature importance, and SHAP plots
     """
-    try:
-        # Validate inputs
-        if not data:
-            raise ValueError("No data provided for analysis")
-        
-        # Check if the specified columns exist in the data
-        sample_row = data[0]
-        available_columns = list(sample_row.keys())
-        
-        if date_column not in available_columns:
-            raise ValueError(f"Date column '{date_column}' not found in data. Available columns: {', '.join(available_columns)}")
-            
-        if target_column not in available_columns:
-            raise ValueError(f"Target column '{target_column}' not found in data. Available columns: {', '.join(available_columns)}")
-        
-        # Train the model
-        model_data = train_xgboost_model(data, date_column, target_column)
-        
-        # Generate SHAP plots
-        shap_data = generate_shap_plots(model_data, multiple_waterfall_plots)
-        
-        # Get feature importance
-        feature_importance = get_feature_importance(model_data)
-        
-        # Return the results
-        return {
-            'metrics': model_data['metrics'],
-            'feature_importance': feature_importance,
-            'shap_plots': shap_data['plots'],
-            'timestamp': datetime.now().isoformat()
-        }
-    except Exception as e:
-        # Provide more context to the error
-        error_message = f"Analysis failed: {str(e)}"
-        raise Exception(error_message) from e 
+    # Train model
+    model_data = train_xgboost_model(data, date_column, target_column)
+    
+    # Get metrics
+    metrics = model_data['metrics']
+    
+    # Get feature importance
+    feature_importance = get_feature_importance(model_data)
+    
+    # Generate SHAP plots
+    shap_data = generate_shap_plots(model_data, multiple_waterfall_plots)
+    
+    # Return results
+    return {
+        'metrics': metrics,
+        'feature_importance': feature_importance,
+        'shap_plots': shap_data['plots']
+    } 

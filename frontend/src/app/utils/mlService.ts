@@ -126,7 +126,8 @@ export async function analyzeDataFromDatasetId(
     console.log(`Using date column: "${dateColumn}", target column: "${targetColumn}"`);
     
     // We call the backend-data proxy endpoint instead of the ML service directly
-    const response = await fetch(`${BACKEND_API_URL}/ml/analyze`, {
+    // const response = await fetch(`${BACKEND_API_URL}/ml/analyze`, {
+      const response = await fetch(`${BACKEND_API_URL}/ml/analyze_efficient`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',

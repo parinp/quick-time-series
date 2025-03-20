@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Get ML service URL from environment variable or use default
-ML_API_URL = os.getenv("ML_API_URL", "http://localhost:8001")
+ML_API_URL = os.getenv("ML_API_URL", "http://localhost:8080")
 
 def test_direct_connection():
     """Test the direct connection to the ML service API"""
