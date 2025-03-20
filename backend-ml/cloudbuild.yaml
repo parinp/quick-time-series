@@ -22,7 +22,7 @@ steps:
       - 'us-central1'
       - '--allow-unauthenticated'
       - '--memory'
-      - '512Mi'
+      - '1Gi'
       - '--cpu'
       - '1'
       - '--min-instances'
