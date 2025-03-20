@@ -15,26 +15,30 @@ import {
 } from '@mui/material';
 
 interface ColumnSelectorProps {
-  columns: string[];
+  data: any[];
   onColumnsSelected: (dateColumn: string, targetColumn: string) => void;
 }
 
-const ColumnSelector: React.FC<ColumnSelectorProps> = ({ columns, onColumnsSelected }) => {
+const ColumnSelector: React.FC<ColumnSelectorProps> = ({ data, onColumnsSelected }) => {
   const [dateColumn, setDateColumn] = React.useState<string>('');
   const [targetColumn, setTargetColumn] = React.useState<string>('');
+  const [columns, setColumns] = React.useState<string[]>([]);
   
-  // Initialize columns when they change
+  // Extract columns from data
   useEffect(() => {
-    if (columns.length > 0) {
+    if (data && data.length > 0) {
+      const extractedColumns = Object.keys(data[0]);
+      setColumns(extractedColumns);
+      
       // Try to guess date column by name
-      const dateColumnGuess = columns.find(col => 
+      const dateColumnGuess = extractedColumns.find(col => 
         col.toLowerCase().includes('date') || 
         col.toLowerCase().includes('time') ||
         col.toLowerCase().includes('day')
       );
       
       // Try to guess target column by name
-      const targetColumnGuess = columns.find(col => 
+      const targetColumnGuess = extractedColumns.find(col => 
         col.toLowerCase().includes('sales') || 
         col.toLowerCase().includes('revenue') ||
         col.toLowerCase().includes('value') ||
@@ -43,18 +47,18 @@ const ColumnSelector: React.FC<ColumnSelectorProps> = ({ columns, onColumnsSelec
       
       if (dateColumnGuess) {
         setDateColumn(dateColumnGuess);
-      } else if (columns.length > 0) {
-        setDateColumn(columns[0]);
+      } else if (extractedColumns.length > 0) {
+        setDateColumn(extractedColumns[0]);
       }
       
       if (targetColumnGuess) {
         setTargetColumn(targetColumnGuess);
-      } else if (columns.length > 1) {
+      } else if (extractedColumns.length > 1) {
         // Set to second column if available, otherwise first
-        setTargetColumn(columns.length > 1 ? columns[1] : columns[0]);
+        setTargetColumn(extractedColumns.length > 1 ? extractedColumns[1] : extractedColumns[0]);
       }
     }
-  }, [columns]);
+  }, [data]);
   
   const handleDateColumnChange = (event: SelectChangeEvent) => {
     setDateColumn(event.target.value);
