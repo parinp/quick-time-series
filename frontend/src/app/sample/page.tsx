@@ -23,12 +23,41 @@ export default function SamplePage() {
     dateColumn,
     setDateColumn,
     targetColumn,
-    setTargetColumn
+    setTargetColumn,
+    resetColumnSelections
   } = useData();
   
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [directStoreInput, setDirectStoreInput] = useState<string>('');
   const [displayedStores, setDisplayedStores] = useState<number[]>([]);
+  
+  // Reset columns when the component mounts, to prevent column name leakage from upload page
+  React.useEffect(() => {
+    // First, reset any existing column selections
+    resetColumnSelections();
+    
+    // Only set default columns if we have data
+    if (!isLoading && allData.length > 0) {
+      const availableColumns = Object.keys(allData[0]);
+      const sampleDateColumn = 'date';
+      const sampleTargetColumn = 'sales';
+      
+      // Set the default sample columns if they exist
+      if (availableColumns.includes(sampleDateColumn)) {
+        setDateColumn(sampleDateColumn);
+      }
+      
+      if (availableColumns.includes(sampleTargetColumn)) {
+        setTargetColumn(sampleTargetColumn);
+      }
+      
+      console.log('Sample page: Set default columns:', {
+        date: sampleDateColumn,
+        target: sampleTargetColumn,
+        available: availableColumns
+      });
+    }
+  }, [isLoading, allData, setDateColumn, setTargetColumn, resetColumnSelections]);
   
   // Set displayed stores for dropdown (limit to 20 for performance)
   React.useEffect(() => {
@@ -36,23 +65,6 @@ export default function SamplePage() {
       setDisplayedStores(storeList.slice(0, 20));
     }
   }, [storeList]);
-  
-  // Ensure default columns are set for sample data
-  React.useEffect(() => {
-    if (!isLoading && allData.length > 0) {
-      const columns = Object.keys(allData[0]);
-      
-      // If date column is not set, try to set it to 'date'
-      if (!dateColumn && columns.includes('date')) {
-        setDateColumn('date');
-      }
-      
-      // If target column is not set, try to set it to 'sales'
-      if (!targetColumn && columns.includes('sales')) {
-        setTargetColumn('sales');
-      }
-    }
-  }, [isLoading, allData, dateColumn, targetColumn, setDateColumn, setTargetColumn]);
   
   // Auto-analyze with default columns when data is loaded
   React.useEffect(() => {
@@ -216,6 +228,7 @@ export default function SamplePage() {
               data={storeFilteredData}
               dateColumn={dateColumn}
               targetColumn={targetColumn}
+              sourcePage="sample"
             />
           )}
         </>

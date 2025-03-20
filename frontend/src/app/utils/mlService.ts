@@ -38,21 +38,24 @@ export interface MLAnalysisResults {
  * @param dateColumn The name of the date column
  * @param targetColumn The name of the target column
  * @param multipleWaterfallPlots Whether to generate multiple waterfall plots for different examples
+ * @param instanceId Optional identifier for tracking which instance made the call
  * @returns Promise with the analysis results
  */
 export async function analyzeData(
   data: TimeSeriesData[],
   dateColumn: string,
   targetColumn: string,
-  multipleWaterfallPlots: boolean = false
+  multipleWaterfallPlots: boolean = false,
+  instanceId?: string
 ): Promise<MLAnalysisResults> {
   try {
-    console.log(`Sending analysis request to ${API_BASE_URL}/analyze`);
-    console.log(`Using date column: "${dateColumn}", target column: "${targetColumn}"`);
+    const logPrefix = instanceId ? `[${instanceId}]` : '';
+    console.log(`${logPrefix} Sending analysis request to ${API_BASE_URL}/analyze`);
+    console.log(`${logPrefix} Using date column: "${dateColumn}", target column: "${targetColumn}"`);
     
     if (data.length > 0) {
-      console.log('Available columns:', Object.keys(data[0]));
-      console.log('Sample data row:', data[0]);
+      console.log(`${logPrefix} Available columns:`, Object.keys(data[0]));
+      console.log(`${logPrefix} Sample data row:`, data[0]);
     }
     
     const response = await fetch(`${API_BASE_URL}/analyze`, {
@@ -75,7 +78,7 @@ export async function analyzeData(
       const errorData = await response.json();
       let errorMessage = 'Failed to analyze data';
       
-      console.error('API error response:', errorData);
+      console.error(`${logPrefix} API error response:`, errorData);
       
       // Extract detailed error message if available
       if (errorData.detail) {
@@ -91,10 +94,11 @@ export async function analyzeData(
       throw new Error(errorMessage);
     }
 
-    console.log('Analysis completed successfully');
+    console.log(`${logPrefix} Analysis completed successfully`);
     return await response.json();
   } catch (error) {
-    console.error('Error analyzing data:', error);
+    const logPrefix = instanceId ? `[${instanceId}]` : '';
+    console.error(`${logPrefix} Error analyzing data:`, error);
     throw error;
   }
 }
@@ -113,21 +117,59 @@ export async function analyzeData(
  * @param dateColumn The name of the date column
  * @param targetColumn The name of the target column
  * @param multipleWaterfallPlots Whether to generate multiple waterfall plots
+ * @param instanceId Optional identifier for tracking which instance made the call
  * @returns Promise with the analysis results
  */
 export async function analyzeDataFromDatasetId(
   datasetId: string,
   dateColumn: string,
   targetColumn: string,
-  multipleWaterfallPlots: boolean = false
+  multipleWaterfallPlots: boolean = false,
+  instanceId?: string
 ): Promise<MLAnalysisResults> {
   try {
-    console.log(`Sending Redis-based analysis request for dataset ${datasetId}`);
-    console.log(`Using date column: "${dateColumn}", target column: "${targetColumn}"`);
+    const logPrefix = instanceId ? `[${instanceId}]` : '';
+    console.log(`${logPrefix} Sending Redis-based analysis request for dataset ${datasetId}`);
+    console.log(`${logPrefix} Using date column: "${dateColumn}", target column: "${targetColumn}"`);
+    
+    if (!dateColumn || !targetColumn) {
+      throw new Error(`${logPrefix} Invalid column parameters: date column="${dateColumn}", target column="${targetColumn}"`);
+    }
+    
+    // Define core features to keep for consistency between "all stores" and store-specific analyses
+    const coreFeatures = ['promo', 'day_of_week', 'state_holiday', 'school_holiday'];
+    
+    // Define store-specific features to exclude
+    const storeSpecificFeatures = [
+      'store_id',
+      'store_type',
+      'assortment',
+      'customers',
+      'competition_distance',
+      'competition_open_since_month',
+      'competition_open_since_year',
+      'promo2',
+      'promo2_since_week',
+      'promo2_since_year',
+      'promo_interval'
+    ];
+    
+    // Combine all features to exclude
+    const excludeColumns = [
+      'created_at', 
+      'updated_at', 
+      'timestamp', 
+      'date_created',
+      'open', // Remove open (always 1 in the data)
+      'id',   // Database ID
+      ...storeSpecificFeatures
+    ];
+    
+    console.log(`${logPrefix} Explicitly including core features: ${coreFeatures.join(', ')}`);
+    console.log(`${logPrefix} Explicitly excluding features: ${excludeColumns.join(', ')}`);
     
     // We call the backend-data proxy endpoint instead of the ML service directly
-    // const response = await fetch(`${BACKEND_API_URL}/ml/analyze`, {
-      const response = await fetch(`${BACKEND_API_URL}/ml/analyze_efficient`, {
+    const response = await fetch(`${BACKEND_API_URL}/ml/analyze_efficient`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -140,16 +182,16 @@ export async function analyzeDataFromDatasetId(
         date_column: dateColumn,
         target_column: targetColumn,
         multiple_waterfall_plots: multipleWaterfallPlots,
-        // Optionally exclude columns that are known to be unhelpful
-        exclude_columns: []
+        include_columns: coreFeatures,
+        exclude_columns: excludeColumns
       }),
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      let errorMessage = 'Failed to analyze data';
+      let errorMessage = 'Failed to analyze data from dataset';
       
-      console.error('API error response:', errorData);
+      console.error(`${logPrefix} API error response for dataset ${datasetId}:`, errorData);
       
       // Extract detailed error message if available
       if (errorData.detail) {
@@ -157,19 +199,20 @@ export async function analyzeDataFromDatasetId(
           errorMessage = errorData.detail;
         } else if (errorData.detail.message) {
           errorMessage = errorData.detail.message;
+        } else if (errorData.detail.error) {
+          errorMessage = `${errorData.detail.error}: ${errorData.detail.message || ''}`;
         }
       }
       
       throw new Error(errorMessage);
     }
 
+    console.log(`${logPrefix} Analysis of dataset ${datasetId} completed successfully`);
     const responseData = await response.json();
-    console.log('Analysis completed successfully');
-    
-    // The results are nested inside the response
     return responseData.results;
   } catch (error) {
-    console.error('Error analyzing data from dataset ID:', error);
+    const logPrefix = instanceId ? `[${instanceId}]` : '';
+    console.error(`${logPrefix} Error analyzing data from dataset ID ${datasetId}:`, error);
     throw error;
   }
 }

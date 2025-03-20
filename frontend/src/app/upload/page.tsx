@@ -11,7 +11,7 @@ import { useData } from '../utils/DataContext';
 import { queryDataset, getDatasetColumns } from '../utils/apiClient';
 
 export default function UploadPage() {
-  const { setDateColumn: setContextDateColumn, setTargetColumn: setContextTargetColumn } = useData();
+  const { setDateColumn: setContextDateColumn, setTargetColumn: setContextTargetColumn, resetColumnSelections } = useData();
   const [data, setData] = useState<TimeSeriesData[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
   const [dateColumn, setDateColumn] = useState<string>('');
@@ -23,6 +23,19 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [ttlInfo, setTtlInfo] = useState<string | null>(null);
   const [isAggregated, setIsAggregated] = useState<boolean>(false);
+
+  // Reset context column values when the upload page mounts
+  // This prevents column name leakage from sample page
+  useEffect(() => {
+    // Reset DataContext column values to prevent interference with sample page
+    resetColumnSelections();
+    
+    // Reset local state as well
+    setDateColumn('');
+    setTargetColumn('');
+    
+    console.log('Upload page mounted - reset column values');
+  }, [resetColumnSelections]);
 
   const handleDataLoaded = async (uploadedData: TimeSeriesData[], uploadedDatasetId?: string) => {
     if (!uploadedDatasetId) {
@@ -120,6 +133,8 @@ export default function UploadPage() {
       }
     }
     
+    console.log(`Setting columns for analysis - Date: "${dateCol}", Target: "${targetCol}"`);
+    
     // Update state values
     setDateColumn(dateCol);
     setTargetColumn(targetCol);
@@ -192,6 +207,26 @@ export default function UploadPage() {
     });
   };
 
+  // Ensure selected columns are valid and available
+  useEffect(() => {
+    if (isAnalyzing && dateColumn && targetColumn) {
+      console.log(`Validating columns for analysis in upload page - Date: "${dateColumn}", Target: "${targetColumn}"`);
+      if (columns.length > 0) {
+        if (!columns.includes(dateColumn)) {
+          console.error(`Selected date column "${dateColumn}" not found in available columns:`, columns);
+          setError(`Selected date column "${dateColumn}" not found in available columns`);
+          setIsAnalyzing(false);
+        }
+        
+        if (!columns.includes(targetColumn)) {
+          console.error(`Selected target column "${targetColumn}" not found in available columns:`, columns);
+          setError(`Selected target column "${targetColumn}" not found in available columns`);
+          setIsAnalyzing(false);
+        }
+      }
+    }
+  }, [isAnalyzing, dateColumn, targetColumn, columns]);
+
   return (
     <Box sx={{ mt: 4 }}>
       <Typography variant="h4" component="h1" gutterBottom color="primary.main">
@@ -238,7 +273,7 @@ export default function UploadPage() {
           </Paper>
           
           <ColumnSelector 
-            columns={columns}
+            data={[columns.reduce((obj, col) => ({ ...obj, [col]: null }), {})]}
             onColumnsSelected={handleColumnsSelected} 
           />
         </>
@@ -247,13 +282,19 @@ export default function UploadPage() {
       {isDataLoaded && isAnalyzing && datasetId && columns.length > 0 && (
         <>
           {data.length > 0 && dateColumn && targetColumn && (
-            <DataVisualization 
-              data={data}
-              dateColumn={dateColumn}
-              targetColumn={targetColumn}
-              isAggregated={isAggregated}
-              datasetId={datasetId}
-            />
+            <>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Using date column: <strong>"{dateColumn}"</strong> and target column: <strong>"{targetColumn}"</strong> for analysis.
+              </Alert>
+              <DataVisualization 
+                data={data}
+                dateColumn={dateColumn}
+                targetColumn={targetColumn}
+                isAggregated={isAggregated}
+                datasetId={datasetId}
+                sourcePage="upload"
+              />
+            </>
           )}
         </>
       )}

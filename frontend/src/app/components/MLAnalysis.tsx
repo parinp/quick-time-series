@@ -31,20 +31,25 @@ interface MLAnalysisProps {
   dateColumn: string;
   targetColumn: string;
   datasetId?: string;
+  instanceId: string;
+  fullData?: TimeSeriesData[];
 }
 
 const MLAnalysis: React.FC<MLAnalysisProps> = ({
   data,
   dateColumn,
   targetColumn,
-  datasetId
+  datasetId,
+  instanceId,
+  fullData
 }) => {
   // Try to use DataContext, but fall back to props if not available
   const dataContext = useData();
   
-  // Use the props values, but if they're empty and we're using sample data, fall back to context values
-  const effectiveDateColumn = dateColumn || (dataContext?.isSampleData ? dataContext?.dateColumn : '');
-  const effectiveTargetColumn = targetColumn || (dataContext?.isSampleData ? dataContext?.targetColumn : '');
+  // IMPORTANT: Always prioritize props for column selection
+  // Only fall back to context if props are empty AND using sample data
+  const effectiveDateColumn = dateColumn || (dataContext?.isSampleData && instanceId === 'sample' ? dataContext?.dateColumn : '');
+  const effectiveTargetColumn = targetColumn || (dataContext?.isSampleData && instanceId === 'sample' ? dataContext?.targetColumn : '');
   
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,15 +58,40 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
   const [checkingApi, setCheckingApi] = useState<boolean>(false);
   const [analysisInitiated, setAnalysisInitiated] = useState<boolean>(false);
   
+  console.log(`[Debug] MLAnalysis instance "${instanceId}" - Props: date=${dateColumn}, target=${targetColumn}, datasetId=${datasetId}`);
+  console.log(`[Debug] MLAnalysis instance "${instanceId}" - Effective columns: date=${effectiveDateColumn}, target=${effectiveTargetColumn}`);
+  
   const shapDescriptions = getShapDescriptions();
   
   // Memoize the data preparation for ML analysis
   const preparedData = useMemo(() => {
-    // Always use the props data, not the context data
-    const sourceData = data;
+    // For sample page, use fullData if provided (which contains the unfiltered dataset)
+    // For upload page or if fullData is not provided, use the props data
+    const sourceData = (instanceId === 'sample' && fullData) ? fullData : data;
+    
+    console.log(`[${instanceId}] Preparing data for ML analysis with ${sourceData?.length || 0} records`);
+    console.log(`[${instanceId}] Using ${(instanceId === 'sample' && fullData) ? 'full unfiltered' : 'filtered'} dataset`);
+    
+    if (!sourceData || sourceData.length === 0) {
+      console.warn(`[${instanceId}] No data provided to MLAnalysis component`);
+      return [];
+    }
     
     if (sourceData.length > 0) {
-      console.log('Available columns:', Object.keys(sourceData[0]));
+      console.log(`[${instanceId}] MLAnalysis received data with columns:`, Object.keys(sourceData[0]));
+      
+      // Verify columns exist in data
+      const availableColumns = Object.keys(sourceData[0]);
+      const hasDateColumn = availableColumns.includes(effectiveDateColumn);
+      const hasTargetColumn = availableColumns.includes(effectiveTargetColumn);
+      
+      if (!hasDateColumn) {
+        console.error(`[${instanceId}] Date column "${effectiveDateColumn}" not found in data. Available columns:`, availableColumns);
+      }
+      
+      if (!hasTargetColumn) {
+        console.error(`[${instanceId}] Target column "${effectiveTargetColumn}" not found in data. Available columns:`, availableColumns);
+      }
     }
     
     // Create a deep copy of the data to avoid modifying the original
@@ -70,18 +100,66 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
       return { ...item };
     });
     
+    // Define a list of core features we want to keep for consistency
+    // These are the features that should be available in both "all stores" and store-specific views
+    const coreFeatures = ['promo', 'day_of_week', 'state_holiday', 'school_holiday'];
+    
+    // Define features to exclude (always remove these)
+    const excludeFeatures = [
+      'open',                 // Remove open (always 1 in the data)
+      'sales',                // This is our target, should be excluded from features
+      'customers',            // This likely has direct correlation with sales
+      'date',                 // This is our date column
+      'store_id',             // Individual store ID
+      'id',                   // Database ID
+      'store_type',           // Store-specific feature
+      'assortment',           // Store-specific feature
+      'competition_distance', // Store-specific feature
+      'competition_open_since_month', // Store-specific feature  
+      'competition_open_since_year',  // Store-specific feature
+      'promo2',               // Store-specific feature
+      'promo2_since_week',    // Store-specific feature
+      'promo2_since_year',    // Store-specific feature
+      'promo_interval'        // Store-specific feature
+    ];
+    
     // Normalize the data to ensure consistent column names
     const normalizedData = dataCopy.map(item => {
-      // Remove 'open' feature if present
-      if ('open' in item) {
-        delete item.open;
-      }
+      const newItem: any = {};
       
-      return item;
+      // First, add the date and target columns
+      newItem[effectiveDateColumn] = item[effectiveDateColumn];
+      newItem[effectiveTargetColumn] = item[effectiveTargetColumn];
+      
+      // Then add only the core features we want to keep
+      coreFeatures.forEach(feature => {
+        if (feature in item) {
+          newItem[feature] = item[feature];
+        }
+      });
+      
+      // Remove timestamp-like columns to prevent them from being used as features
+      Object.keys(newItem).forEach(key => {
+        // Check for created_at and other timestamp-like columns
+        if (key.includes('created_at') || 
+            key.includes('timestamp') || 
+            key.toLowerCase().includes('_at') ||
+            // Also remove any columns with date or time in their name except the main date column
+            (key !== effectiveDateColumn && 
+              (key.toLowerCase().includes('date') || 
+               key.toLowerCase().includes('time')))
+           ) {
+          delete newItem[key];
+        }
+      });
+      
+      return newItem;
     });
     
+    console.log(`[${instanceId}] Normalized data with consistent features:`, Object.keys(normalizedData[0]));
+    
     return normalizedData;
-  }, [data, dateColumn, targetColumn]);
+  }, [data, effectiveDateColumn, effectiveTargetColumn, instanceId, fullData]);
   
   // Define handleAnalyze with useCallback to avoid dependency issues
   const handleAnalyze = useCallback(async () => {
@@ -92,21 +170,34 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
     setAnalysisInitiated(true);
     
     try {
+      console.log(`[${instanceId}] Starting ML Analysis with:`, {
+        dateColumn: effectiveDateColumn,
+        targetColumn: effectiveTargetColumn,
+        dataLength: preparedData.length,
+        datasetId: datasetId || 'not provided'
+      });
+      
       // Check if data has the specified columns
       if (preparedData.length > 0) {
         const sampleRow = preparedData[0];
         const availableColumns = Object.keys(sampleRow);
         
+        console.log(`[${instanceId}] Available columns in preprocessed data:`, availableColumns);
+        console.log(`[${instanceId}] Feature columns that will be used in ML analysis:`, 
+          availableColumns.filter(col => col !== effectiveDateColumn && col !== effectiveTargetColumn));
+        console.log(`[${instanceId}] Checking for date column:`, effectiveDateColumn);
+        console.log(`[${instanceId}] Checking for target column:`, effectiveTargetColumn);
+        
         // Directly use the column names provided by props
         if (!availableColumns.includes(effectiveDateColumn)) {
           const errorMsg = `Date column "${effectiveDateColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`;
-          console.error(errorMsg);
+          console.error(`[${instanceId}] ${errorMsg}`);
           throw new Error(errorMsg);
         }
         
         if (!availableColumns.includes(effectiveTargetColumn)) {
           const errorMsg = `Target column "${effectiveTargetColumn}" not found in data. Available columns: ${availableColumns.join(', ')}`;
-          console.error(errorMsg);
+          console.error(`[${instanceId}] ${errorMsg}`);
           throw new Error(errorMsg);
         }
         
@@ -114,16 +205,21 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
         
         // If we have a dataset ID, use the optimized Redis-based approach
         if (datasetId) {
-          console.log(`Using optimized Redis-based approach with dataset ID: ${datasetId}`);
+          console.log(`[${instanceId}] Using optimized Redis-based approach with dataset ID: ${datasetId}`);
+          console.log(`[${instanceId}] Using columns directly from props: date="${dateColumn}", target="${targetColumn}"`);
+          
+          // For uploaded data with datasetId, use the props directly rather than effective columns
+          // This ensures we're using exactly what was selected in the upload page
           analysisResults = await analyzeDataFromDatasetId(
             datasetId,
-            effectiveDateColumn,
-            effectiveTargetColumn,
-            true // Always use multiple waterfall plots
+            dateColumn, // Use props directly
+            targetColumn, // Use props directly
+            true, // Always use multiple waterfall plots
+            instanceId // Pass instanceId to help with logging and tracking
           );
         } else {
           // Otherwise, use the standard approach with data in memory
-          console.log('Using standard in-memory approach');
+          console.log(`[${instanceId}] Using standard in-memory approach`);
           // Create a copy of the data specifically for the ML API
           const mlData = preparedData.map(item => {
             const newItem = { ...item };
@@ -131,27 +227,46 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
             // Ensure date is in string format for the ML API
             if (newItem[effectiveDateColumn] instanceof Date) {
               newItem[effectiveDateColumn] = newItem[effectiveDateColumn].toISOString();
+            } else if (typeof newItem[effectiveDateColumn] === 'string') {
+              // If it's already a string, make sure it's a valid date string
+              try {
+                const parsedDate = new Date(newItem[effectiveDateColumn]);
+                if (!isNaN(parsedDate.getTime())) {
+                  newItem[effectiveDateColumn] = parsedDate.toISOString();
+                }
+              } catch (e) {
+                console.warn(`[${instanceId}] Error converting date string:`, e);
+              }
             }
             
             return newItem;
           });
           
+          console.log(`[${instanceId}] Sample row ready for ML API:`, mlData[0]);
+          console.log(`[${instanceId}] Analysis will be performed with ${mlData.length} rows and ${Object.keys(mlData[0]).length} columns`);
+          
           // Request multiple waterfall plots for different examples
-          analysisResults = await analyzeData(mlData, effectiveDateColumn, effectiveTargetColumn, true);
+          analysisResults = await analyzeData(
+            mlData, 
+            effectiveDateColumn, 
+            effectiveTargetColumn, 
+            true, // Always use multiple waterfall plots
+            instanceId // Pass instanceId to help with logging and tracking
+          );
         }
         
         setResults(analysisResults);
       } else {
-        throw new Error('No data available for analysis');
+        throw new Error(`[${instanceId}] No data available for analysis`);
       }
     } catch (err) {
-      console.error('ML Analysis error:', err);
+      console.error(`[${instanceId}] ML Analysis error:`, err);
       setError(err instanceof Error ? err.message : 'An error occurred during analysis');
       setAnalysisInitiated(false); // Reset if there's an error so we can try again
     } finally {
       setLoading(false);
     }
-  }, [preparedData, effectiveDateColumn, effectiveTargetColumn, loading, datasetId]);
+  }, [preparedData, effectiveDateColumn, effectiveTargetColumn, loading, datasetId, dateColumn, targetColumn, instanceId]);
   
   // Check if the API is available when the component mounts
   useEffect(() => {
@@ -572,6 +687,14 @@ const MLAnalysis: React.FC<MLAnalysisProps> = ({
         <Typography variant="body2" paragraph>
           SHAP (SHapley Additive exPlanations) values are used to explain the model's predictions and understand feature importance.
         </Typography>
+        
+        {instanceId === 'sample' && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>Note:</strong> This analysis is performed on the complete dataset across all stores, not just the currently selected store. This ensures consistent feature importance and model performance regardless of store selection.
+            </Typography>
+          </Alert>
+        )}
         
         {renderApiStatus()}
         

@@ -25,6 +25,7 @@ interface DataContextType {
   setDateColumn: (column: string) => void;
   targetColumn: string;
   setTargetColumn: (column: string) => void;
+  resetColumnSelections: () => void; // New method to reset column selections
   // Time Series filters
   tsFilterStartDate: Date | null;
   setTsFilterStartDate: (date: Date | null) => void;
@@ -246,6 +247,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setSelectedStore(storeId);
   }, []);
 
+  // Method to reset column selections
+  const resetColumns = useCallback(() => {
+    setDateColumn('');
+    setTargetColumn('');
+    console.log('DataContext: Column selections reset');
+  }, []);
+
   const value = {
     allData, // Keep allData for ML analysis
     storeFilteredData,
@@ -261,6 +269,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDateColumn,
     targetColumn,
     setTargetColumn,
+    resetColumnSelections: resetColumns,
     tsFilterStartDate,
     setTsFilterStartDate,
     tsFilterEndDate,

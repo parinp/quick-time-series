@@ -41,6 +41,7 @@ interface DataVisualizationProps {
   targetColumn: string;
   isAggregated?: boolean;
   datasetId?: string;
+  sourcePage?: 'sample' | 'upload';
 }
 
 const DataVisualization: React.FC<DataVisualizationProps> = ({ 
@@ -48,14 +49,26 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
   dateColumn, 
   targetColumn,
   isAggregated = false,
-  datasetId
+  datasetId,
+  sourcePage = 'sample'
 }) => {
-  // Try to use DataContext for fallback values
+  // Try to use DataContext for fallback values and accessing all data
   const dataContext = useData();
   
   // Use the props values, but if they're empty and we're using sample data, fall back to context values
   const effectiveDateColumn = dateColumn || (dataContext?.isSampleData ? dataContext?.dateColumn : '');
   const effectiveTargetColumn = targetColumn || (dataContext?.isSampleData ? dataContext?.targetColumn : '');
+  
+  // Add additional logging for tracking column props
+  useEffect(() => {
+    console.log('DataVisualization received props:', {
+      dateColumn,
+      targetColumn,
+      isAggregated,
+      datasetId,
+      dataLength: data?.length || 0
+    });
+  }, [dateColumn, targetColumn, isAggregated, datasetId, data?.length]);
   
   console.log('DataVisualization component rendering with:', {
     dataLength: data?.length,
@@ -64,7 +77,8 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
     effectiveDateColumn,
     effectiveTargetColumn,
     isAggregated,
-    sampleRow: data && data.length > 0 ? data[0] : null
+    sampleRow: data && data.length > 0 ? data[0] : null,
+    allDataLength: dataContext?.allData?.length || 0
   });
 
   // Initialize local state for this component
@@ -678,10 +692,12 @@ const DataVisualization: React.FC<DataVisualizationProps> = ({
       
       {/* ML Analysis Section */}
       <MLAnalysis 
-        data={processedData}
-        dateColumn={effectiveDateColumn}
-        targetColumn={effectiveTargetColumn}
+        data={data}
+        dateColumn={dateColumn}
+        targetColumn={targetColumn}
         datasetId={datasetId}
+        instanceId={sourcePage}
+        fullData={sourcePage === 'sample' ? dataContext?.allData : undefined}
       />
     </Box>
   );
