@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: timeseries-backend
+    env: python
+    plan: free
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: ENVIRONMENT
+        value: production
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: DEFAULT_TTL
+        value: 3600
+      - key: ML_API_URL
+        # Comment this line and update with your actual deployed ML service URL
+        # For GCP Cloud Run deployment:
+        value: https://ml-timeseries-analysis-YOUR_PROJECT_ID.a.run.app
+      - key: ALLOWED_ORIGINS
+        value: "https://your-project.vercel.app"
+    autoDeploy: true
+    healthCheckPath: /health
+    numInstances: 1 

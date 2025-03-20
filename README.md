@@ -6,7 +6,7 @@ An interactive web application for time series data visualization and analysis, 
 
 - **Interactive Data Visualization**: Visualize time series data with various chart types including line charts, bar charts, histograms, and box plots.
 - **Sample Data Analysis**: Explore the Rossmann Store Sales dataset with data from Supabase.
-- **Custom Data Upload**: Upload your own CSV files for analysis (up to 40MB).
+- **Custom Data Upload**: Upload your own CSV files for analysis (up to 25MB).
 - **CSV to Parquet Conversion**: Automatically converts CSV data to Parquet format for efficient storage.
 - **Redis Caching**: Uses Upstash Redis for in-memory caching of uploaded data.
 - **Time Pattern Detection**: Analyze patterns by month, day of week, and other time dimensions.
@@ -14,71 +14,140 @@ An interactive web application for time series data visualization and analysis, 
 - **Missing Value Analysis**: Identify and analyze missing values in your data.
 - **Database Integration**: Connect to Supabase for persistent data storage and retrieval.
 
+## User Upload Version 2 Implementation Checklist
+
+### Frontend (React with Vercel Free Tier)
+- [x] Update file upload component to handle larger files (up to 25MB)
+- [x] Implement chunked file upload for large CSV files
+- [x] Add progress indicator for file uploads
+- [x] Create filter UI for querying data from Redis/DuckDB
+- [x] Implement visualization components for filtered data
+- [x] Add TTL indicator showing when data will be auto-deleted
+
+### Backend (Python on Render)
+- [x] Set up Python backend on Render
+- [x] Implement CSV to Parquet conversion
+- [x] Configure Upstash Redis integration with TTL-based auto-delete
+- [x] Create API endpoints for data filtering and querying
+- [x] Implement DuckDB for efficient data querying
+- [x] Add data cleanup mechanism for expired data
+
+### Data Flow Implementation
+- [x] User uploads CSV (up to 25MB) → Backend converts to Parquet
+- [x] Parquet is stored in Upstash Redis with TTL-based auto-delete
+- [x] When user applies filters, backend queries Redis, loads Parquet into DuckDB
+- [x] Only filtered data is sent back to frontend for faster response
+- [x] Data auto-deletes after TTL, keeping storage cost-free
+
+## Architecture
+
+The application follows a modern architecture with separate frontend and backend components:
+
+### Frontend (React/Next.js on Vercel)
+- React with Next.js for the user interface
+- Material UI for components and styling
+- Plotly.js for interactive data visualization
+- API client for communicating with the backend
+
+### Backend (Python/FastAPI on Render)
+- FastAPI for high-performance API endpoints
+- Pandas and PyArrow for data processing
+- DuckDB for efficient data querying
+- Redis for caching with TTL-based auto-delete
+
+### Data Flow
+1. User uploads CSV (up to 25MB) → Backend converts to Parquet
+2. Parquet is stored in Upstash Redis with TTL-based auto-delete
+3. When user applies filters, backend queries Redis, loads Parquet into DuckDB
+4. Only filtered data is sent back to frontend for faster response
+5. Data auto-deletes after TTL, keeping storage cost-free
+
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18.x or later
+- Node.js 18.x or higher
+- Python 3.11 or higher
 - npm or yarn
-- Supabase account (free tier is sufficient)
-- Upstash Redis account (free tier is sufficient)
-- Python 3.8+ (for ML API server)
+- Redis (Upstash Redis recommended)
 
-### Installation
+### Frontend Setup
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/time-series-dashboard.git
-   cd time-series-dashboard
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    npm install
    # or
    yarn install
    ```
 
-3. Set up Supabase:
-   - Create a new project in [Supabase](https://supabase.com/)
-   - Run the SQL scripts from `cloud-run-service/supabase_rossmann_normalized.sql` in the Supabase SQL Editor
-   - Run the SQL script from `cloud-run-service/supabase_add_day_of_week.sql` to add the day_of_week column
-   - Upload the Rossmann data using the script in `cloud-run-service/upload_rossmann_supabase_api.py`
-
-4. Set up Upstash Redis:
-   - Create a free account at [Upstash](https://upstash.com/)
-   - Create a new Redis database
-   - Copy your REST URL and REST Token from the database details page
-
-5. Set up environment variables:
+2. Set up environment variables:
    ```bash
-   # Copy the example .env file
-   cp .env.local.example .env.local
-   # Edit .env.local with your Supabase and Upstash Redis credentials
+   cp .env.example .env.local
+   ```
+   
+   Update the `.env.local` file with your configuration:
+   ```
+   NEXT_PUBLIC_BACKEND_API_URL=http://localhost:8000
    ```
 
-   Your `.env.local` file should include:
-   ```
-   # Supabase credentials
-   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-   
-   # Upstash Redis credentials
-   UPSTASH_REDIS_REST_URL=your_upstash_redis_url
-   UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
-   
-   # Optional: Set the expiration time for cached data in seconds (default: 3600 = 1 hour)
-   REDIS_CACHE_EXPIRATION=3600
-   ```
-
-6. Run the development server:
+3. Run the development server:
    ```bash
    npm run dev
    # or
    yarn dev
    ```
 
-7. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+   
+   Update the `.env` file with your configuration:
+   ```
+   UPSTASH_REDIS_REST_URL=your_upstash_redis_url
+   UPSTASH_REDIS_REST_TOKEN=your_upstash_redis_token
+   ```
+
+4. Run the server:
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+5. The API will be available at [http://localhost:8000](http://localhost:8000).
+
+## Deployment
+
+### Frontend Deployment (Vercel)
+
+1. Push your code to a GitHub repository
+2. Connect your repository to Vercel
+3. Add your environment variables in the Vercel dashboard
+4. Deploy the application
+
+### Backend Deployment (Render)
+
+1. Push your code to a GitHub repository
+2. Create a new Web Service on Render
+3. Connect your GitHub repository
+4. Configure the service:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT`
+5. Add environment variables from your `.env` file
+6. Deploy the service
 
 ## Running the ML API Server Locally
 
@@ -94,59 +163,54 @@ The application includes a machine learning component that requires a separate P
 
 ### Starting the ML Server
 
-#### Windows
-Run the included batch file:
+There are two ML backend options:
+1. The standard backend (`backend-ml`) with full ML capabilities
+2. The data backend (`backend-data`) for data processing and ML proxying
+
+#### Starting Both Backends
+
+Run the following commands in separate terminal windows:
+
 ```bash
-run_ml_server.bat
+# Start the ML backend
+cd backend-ml
+python server.py
+
+# Start the data backend in another terminal
+cd backend-data
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-#### macOS/Linux
-Run the included shell script:
-```bash
-chmod +x run_ml_server.sh
-./run_ml_server.sh
-```
+The ML API server will be available at http://localhost:8080, and the data API will be available at http://localhost:8000.
 
-#### Manual Start
-You can also start the server manually:
-```bash
-cd src/app/api/ml
-python run_local_server.py
-```
+### Memory-Efficient ML Implementation
 
-The ML API server will be available at http://localhost:8000. The main application will automatically connect to this server when it's running.
+The application includes a memory-efficient ML implementation optimized for environments with limited resources, such as the GCP Cloud Run free tier (256MB memory, 1 vCPU).
+
+#### Key Features
+
+- **Memory-Optimized Processing**: Processes data in chunks to keep memory usage under 256MB
+- **Single-CPU Optimization**: All operations are optimized for a single CPU environment
+- **Chunked Processing Strategy**: Intelligently processes data in chunks with dynamic adjustment
+- **Resource Monitoring**: Tracks memory usage and processing time with detailed reports
+
+#### When to Use Memory-Efficient ML
+
+Use the memory-efficient implementation when:
+- Running in resource-constrained environments (e.g., GCP Cloud Run free tier)
+- Processing large datasets that may exceed memory limits
+- Needing detailed resource usage metrics and estimates
+
+For most development and testing purposes, the standard ML endpoint is sufficient.
 
 ### Testing the ML Server
 
 To verify the ML server is running correctly, visit:
 ```
-http://localhost:8000/health
+http://localhost:8080/health
 ```
 
 You should see a response: `{"status":"healthy"}`
-
-### Testing with Custom Column Names
-
-The ML API now supports any column names for date and target values. To test this functionality:
-
-#### Windows
-```bash
-test_ml_api.bat
-```
-
-#### macOS/Linux
-```bash
-chmod +x test_ml_api.sh
-./test_ml_api.sh
-```
-
-#### Manual Test
-```bash
-cd src/app/api/ml
-python test_api.py
-```
-
-This test script generates sample data with custom column names (`Date_custom` and `Sales_custom`) and sends it to the API for analysis. If successful, it will display the model metrics and feature importance.
 
 ## Usage
 
@@ -160,7 +224,7 @@ This test script generates sample data with custom column names (`Date_custom` a
 ### Custom Data Upload
 
 1. Navigate to the "Upload Data" page from the navigation bar.
-2. Click "Select CSV File" and choose a CSV file from your computer (max 40MB).
+2. Click "Select CSV File" and choose a CSV file from your computer (max 25MB).
 3. The file will be uploaded, converted to Parquet format, and cached in Redis.
 4. Once uploaded, select the date column and target column from your data.
 5. Click "Analyze" to generate visualizations and statistics.

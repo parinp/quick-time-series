@@ -1,0 +1,38 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/ml-timeseries-analysis', '.']
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/ml-timeseries-analysis']
+  
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ml-timeseries-analysis'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/ml-timeseries-analysis'
+      - '--platform'
+      - 'managed'
+      - '--region'
+      - 'us-central1'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '1'
+      - '--timeout'
+      - '300s'
+      # - '--set-env-vars'
+      # - 'ENVIRONMENT=production, ALLOWED_ORIGINS=https://simple-timeseries-analysis.vercel.app,https://timeseries-backend.onrender.com'
+      
+images:
+  - 'gcr.io/$PROJECT_ID/ml-timeseries-analysis' 
